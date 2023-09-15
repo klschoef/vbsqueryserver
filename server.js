@@ -5,6 +5,8 @@ const fs = require('fs');
 
 const { v4: uuidv4 } = require('uuid');
 
+const LOGFILE = 'vbsqueryserverlog.json'
+
 const DISTINCTIVE_L2DIST1 = 10.0;
 const DISTINCTIVE_L2DIST2 = 15.0;
 const CLIPSERVERURL = 'ws://' + config.config_CLIP_SERVER; //'ws://extreme00.itec.aau.at:8002';
@@ -91,7 +93,7 @@ wss.on('connection', (ws) => {
 
             // Append jsonString to the file
             msg.clientId = clientId;
-            fs.appendFile('lscqueryserverlog.json', JSON.stringify(msg), function (err) {
+            fs.appendFile(LOGFILE, JSON.stringify(msg), function (err) {
                 if (err) {
                     console.log('Error writing file', err)
                 }
@@ -151,7 +153,7 @@ wss.on('connection', (ws) => {
 
                             // Append jsonString to the file
                             queryResults.clientId = clientId;
-                            fs.appendFile('lscqueryserverlog.json', JSON.stringify(queryResults), function (err) {
+                            fs.appendFile(LOGFILE, JSON.stringify(queryResults), function (err) {
                                 if (err) {
                                     console.log('Error writing file', err)
                                 }
@@ -168,7 +170,7 @@ wss.on('connection', (ws) => {
 
                         // Append jsonString to the file
                         queryResults.clientId = clientId;
-                        fs.appendFile('lscqueryserverlog.json', JSON.stringify(queryResults), function (err) {
+                        fs.appendFile(LOGFILE, JSON.stringify(queryResults), function (err) {
                             if (err) {
                                 console.log('Error writing file', err)
                             }
@@ -366,7 +368,7 @@ function connectToCLIPServer() {
 
                     // Append jsonString to the file
                     msg.clientId = clientId;
-                    fs.appendFile('lscqueryserverlog.json', JSON.stringify(msg), function (err) {
+                    fs.appendFile(LOGFILE, JSON.stringify(msg), function (err) {
                         if (err) {
                             console.log('Error writing file', err)
                         }
@@ -431,11 +433,11 @@ function connectToCLIPServer() {
                 }
                 console.log('forwarding %d results (current before=%d after=%d) to client %s', msg.totalresults, numbefore, numafter, clientId);
                 //console.log(JSON.stringify(msg));
-                //clientWS.send(JSON.stringify(msg));
+                clientWS.send(JSON.stringify(msg));
 
                 // Append jsonString to the file
                 msg.clientId = clientId;
-                fs.appendFile('lscqueryserverlog.json', JSON.stringify(msg), function (err) {
+                fs.appendFile(LOGFILE, JSON.stringify(msg), function (err) {
                     if (err) {
                         console.log('Error writing file', err)
                     }
@@ -500,7 +502,7 @@ async function queryImages(yearValue, monthValue, dayValue, weekdayValue, textVa
 
             // Append jsonString to the file
             queryResults.clientId = clientId;
-            fs.appendFile('lscqueryserverlog.json', JSON.stringify(queryResults), function (err) {
+            fs.appendFile(LOGFILE, JSON.stringify(queryResults), function (err) {
                 if (err) {
                     console.log('Error writing file', err)
                 }
