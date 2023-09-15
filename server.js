@@ -431,7 +431,7 @@ function connectToCLIPServer() {
                 }
                 console.log('forwarding %d results (current before=%d after=%d) to client %s', msg.totalresults, numbefore, numafter, clientId);
                 //console.log(JSON.stringify(msg));
-                clientWS.send(JSON.stringify(msg));
+                //clientWS.send(JSON.stringify(msg));
 
                 // Append jsonString to the file
                 msg.clientId = clientId;
