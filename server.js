@@ -903,7 +903,7 @@ async function queryOCRText(clientId, queryInput) {
             }
         }}};
 
-        const cursor = collection.find(query);
+        const cursor = collection.find(query).project({_id:0,videoid:1});
         let results = [];
         await cursor.forEach(document => {
             results.push(document);
