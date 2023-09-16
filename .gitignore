@@ -118,3 +118,5 @@ dist
 .pnp.*
 local-config.js
 lscqueryserverlog.json
+
+*log.json
