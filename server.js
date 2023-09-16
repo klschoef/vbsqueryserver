@@ -92,6 +92,8 @@ wss.on('connection', (ws) => {
             getVideoInfo(clientId, msg.content);
         } else if (msg.content.type === 'videosummaries') {
             getVideoSummaries(clientId, msg.content);
+        } else if (msg.content.type === 'ocr-text') {
+            queryOCRText(clientId, msg.content);
         } else {
             //check CLIPserver connection
             if (clipWebSocket === null) {
@@ -495,6 +497,8 @@ function connectMongoDB() {
     });
 }
 
+
+
 async function queryImages(yearValue, monthValue, dayValue, weekdayValue, textValue, conceptValue, objectValue, placeValue, filenameValue, clientId) {
   try {
     if (!mongoclient.isConnected()) {
@@ -878,14 +882,41 @@ async function getVideoSummaries(clientId, queryInput) {
         let response = { "type": "videosummaries", "content": results };
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
-        console.log('sent back: ' + JSON.stringify(response))
+        //console.log('sent back: ' + JSON.stringify(response))
 
     }  catch (error) {
         console.log("error with mongodb: " + error);
         await mongoclient.close();
-    } finally {
-      // Close the MongoDB connection when finished
-      //await mongoclient.close();
-    }
+    } 
+}
+
+async function queryOCRText(clientId, queryInput) {
+    try {
+        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const collection = database.collection('videos'); // Replace with your collection name
+
+        let query = {};
+        query = {'texts': {'$elemMatch': {
+            'text': {
+                '$regex': queryInput.query,
+                '$options': 'i'
+            }
+        }}};
+
+        const cursor = collection.find(query);
+        let results = [];
+        await cursor.forEach(document => {
+            results.push(document);
+        });
+
+        let response = { "type": "ocr-text", "content": results };
+        clientWS = clients.get(clientId);
+        clientWS.send(JSON.stringify(response));
+        //console.log('sent back: ' + JSON.stringify(response))
+
+    }  catch (error) {
+        console.log("error with mongodb: " + error);
+        await mongoclient.close();
+    } 
 }
 
