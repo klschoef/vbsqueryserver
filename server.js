@@ -84,70 +84,91 @@ wss.on('connection', (ws) => {
         console.log('received from client: %s (%s)', message, clientId);
         // Handle the received message as needed
 
-        //check CLIPserver connection
-        if (clipWebSocket === null) {
-            console.log('clipWebSocket is null');
+        msg = JSON.parse(message);
+
+        if (msg.content.type === 'clusters') {
+            queryClusters(clientId);
         } else {
 
-            msg = JSON.parse(message);
-
-            // Append jsonString to the file
-            msg.clientId = clientId;
-            fs.appendFile(LOGFILE, JSON.stringify(msg), function (err) {
-                if (err) {
-                    console.log('Error writing file', err)
-                }
-            });
-
-            if (msg.content.type === 'textquery') { // || msg.content.type == 'file-similarityquery'
-
-                nodequery = msg.content.query;
-
-                queryMode = msg.content.queryMode;
-
-                lenBefore = msg.content.query.trim().length;
-                clipQuery = parseParameters(msg.content.query)
-                combineCLIPWithMongo = false;
-                filterCLIPResultsByDate = false;
-
-                //special hack for file-similarity
-                /*if (similarto !== '') {
-                    msg.query = similarto;
-                    msg.pathprefix = '';
-                    msg.type = 'file-similarityquery';
-                    clipQuery = 'non-empty-string';
-                }*/
+            //check CLIPserver connection
+            if (clipWebSocket === null) {
+                console.log('clipWebSocket is null');
+            } else {
                 
-                if (clipQuery.trim().length > 0) {
-                    msg.content.query = clipQuery
-                    msg.content.clientId = clientId
-
-                    if (clipQuery.length !== lenBefore) { //msg.content.query.trim().length || isOnlyDateFilter()) {
-                        msg.content.resultsperpage = msg.content.maxresults;
+                // Append jsonString to the file
+                msg.clientId = clientId; //give client a unique id on the node server (and set it for every msg)
+                fs.appendFile(LOGFILE, JSON.stringify(msg), function (err) {
+                    if (err) {
+                        console.log('Error writing file', err)
                     }
+                });
 
-                    console.log('sending to CLIP server: "%s" len=%d content-len=%d (rpp=%d, max=%d) - %d %d %d', clipQuery, clipQuery.length, msg.content.query.length, msg.content.resultsperpage, msg.content.maxresults, clipQuery.length, msg.content.query.trim().length, lenBefore);
+                if (msg.content.type === 'textquery') { // || msg.content.type == 'file-similarityquery'
+
+                    nodequery = msg.content.query;
+
+                    queryMode = msg.content.queryMode;
+
+                    lenBefore = msg.content.query.trim().length;
+                    clipQuery = parseParameters(msg.content.query)
+                    combineCLIPWithMongo = false;
+                    filterCLIPResultsByDate = false;
+
+                    //special hack for file-similarity
+                    /*if (similarto !== '') {
+                        msg.query = similarto;
+                        msg.pathprefix = '';
+                        msg.type = 'file-similarityquery';
+                        clipQuery = 'non-empty-string';
+                    }*/
                     
+                    if (clipQuery.trim().length > 0) {
+                        msg.content.query = clipQuery
+                        msg.content.clientId = clientId
 
-                    if (isOnlyDateFilter() && queryMode !== 'distinctive' && queryMode !== 'moredistinctive') {
-                        //C L I P   Q U E R Y   +   F I L T E R
-                        filterCLIPResultsByDate = true;
-                        //msg.content.resultsperpage = msg.content.maxresults;
-                        clipWebSocket.send(JSON.stringify(msg));
+                        if (clipQuery.length !== lenBefore) { //msg.content.query.trim().length || isOnlyDateFilter()) {
+                            msg.content.resultsperpage = msg.content.maxresults;
+                        }
+
+                        console.log('sending to CLIP server: "%s" len=%d content-len=%d (rpp=%d, max=%d) - %d %d %d', clipQuery, clipQuery.length, msg.content.query.length, msg.content.resultsperpage, msg.content.maxresults, clipQuery.length, msg.content.query.trim().length, lenBefore);
+                        
+
+                        if (isOnlyDateFilter() && queryMode !== 'distinctive' && queryMode !== 'moredistinctive') {
+                            //C L I P   Q U E R Y   +   F I L T E R
+                            filterCLIPResultsByDate = true;
+                            //msg.content.resultsperpage = msg.content.maxresults;
+                            clipWebSocket.send(JSON.stringify(msg));
+                        } else {
+                            //C L I P   +   D B   Q U E R Y
+                            combineCLIPWithMongo = true;
+                            //msg.content.resultsperpage = msg.content.maxresults;
+                            clipWebSocket.send(JSON.stringify(msg));
+                        }
+
+                        
                     } else {
-                        //C L I P   +   D B   Q U E R Y
-                        combineCLIPWithMongo = true;
-                        //msg.content.resultsperpage = msg.content.maxresults;
-                        clipWebSocket.send(JSON.stringify(msg));
-                    }
+                        //D B   Q U E R Y
+                        console.log('querying Node server');
+                        queryImages(year, month, day, weekday, text, concept, object, place, filename, clientId).then((queryResults) => {
+                            console.log("query* finished");
+                            if ("results" in queryResults) {
+                                console.log('sending %d results to client', queryResults.results.length);
+                                ws.send(JSON.stringify(queryResults));
 
-                    
-                } else {
-                    //D B   Q U E R Y
-                    console.log('querying Node server');
-                    queryImages(year, month, day, weekday, text, concept, object, place, filename, clientId).then((queryResults) => {
-                        console.log("query* finished");
-                        if ("results" in queryResults) {
+                                // Append jsonString to the file
+                                queryResults.clientId = clientId;
+                                fs.appendFile(LOGFILE, JSON.stringify(queryResults), function (err) {
+                                    if (err) {
+                                        console.log('Error writing file', err)
+                                    }
+                                });
+                            }
+                        });
+                    }
+                } else if (msg.content.type === 'metadataquery') {
+                    queryImage(msg.content.imagepath).then((queryResults) => {
+                        console.log("query finished");
+                        if (queryResults != undefined && "results" in queryResults) {
                             console.log('sending %d results to client', queryResults.results.length);
                             ws.send(JSON.stringify(queryResults));
 
@@ -160,35 +181,19 @@ wss.on('connection', (ws) => {
                             });
                         }
                     });
+                } 
+                else if (msg.content.type === 'objects') {
+                    queryObjects(clientId);
                 }
-            } else if (msg.content.type === 'metadataquery') {
-                queryImage(msg.content.imagepath).then((queryResults) => {
-                    console.log("query finished");
-                    if (queryResults != undefined && "results" in queryResults) {
-                        console.log('sending %d results to client', queryResults.results.length);
-                        ws.send(JSON.stringify(queryResults));
-
-                        // Append jsonString to the file
-                        queryResults.clientId = clientId;
-                        fs.appendFile(LOGFILE, JSON.stringify(queryResults), function (err) {
-                            if (err) {
-                                console.log('Error writing file', err)
-                            }
-                        });
-                    }
-                });
-            } 
-            else if (msg.content.type === 'objects') {
-                queryObjects(clientId);
-            }
-            else if (msg.content.type === 'concepts') {
-                queryConcepts(clientId);
-            }
-            else if (msg.content.type === 'places') {
-                queryPlaces(clientId);
-            }
-            else if (msg.content.type === 'texts') {
-                queryTexts(clientId);
+                else if (msg.content.type === 'concepts') {
+                    queryConcepts(clientId);
+                }
+                else if (msg.content.type === 'places') {
+                    queryPlaces(clientId);
+                }
+                else if (msg.content.type === 'texts') {
+                    queryTexts(clientId);
+                }
             }
         }
     });
@@ -646,7 +651,7 @@ async function queryImage(url) {
             console.log('mongodb not connected!');
             connectMongoDB();
         } else {
-            const database = mongoclient.db('lsc'); // Replace with your database name
+            const database = mongoclient.db('vbs2023'); // Replace with your database name
             const collection = database.collection('images'); // Replace with your collection name
         
             let query = { "filepath": url }; 
@@ -683,7 +688,7 @@ async function queryObjects(clientId) {
             console.log('mongodb not connected!');
             connectMongoDB();
         } else {
-            const database = mongoclient.db('lsc'); // Replace with your database name
+            const database = mongoclient.db('vbs2023'); // Replace with your database name
             const collection = database.collection('objects'); // Replace with your collection name
         
             const cursor = collection.find({},{name:1}).sort({name: 1});
@@ -713,7 +718,7 @@ async function queryObjects(clientId) {
             console.log('mongodb not connected!');
             connectMongoDB();
         } else {
-            const database = mongoclient.db('lsc'); // Replace with your database name
+            const database = mongoclient.db('vbs2023'); // Replace with your database name
             const collection = database.collection('concepts'); // Replace with your collection name
         
             const cursor = collection.find({},{name:1}).sort({name: 1});
@@ -743,7 +748,7 @@ async function queryObjects(clientId) {
             console.log('mongodb not connected!');
             connectMongoDB();
         } else {
-            const database = mongoclient.db('lsc'); // Replace with your database name
+            const database = mongoclient.db('vbs2023'); // Replace with your database name
             const collection = database.collection('places'); // Replace with your collection name
         
             const cursor = collection.find({},{name:1}).sort({name: 1});
@@ -773,7 +778,7 @@ async function queryObjects(clientId) {
             console.log('mongodb not connected!');
             connectMongoDB();
         } else {
-            const database = mongoclient.db('lsc'); // Replace with your database name
+            const database = mongoclient.db('vbs2023'); // Replace with your database name
             const collection = database.collection('texts'); // Replace with your collection name
         
             const cursor = collection.find({},{name:1}).sort({name: 1});
@@ -787,6 +792,36 @@ async function queryObjects(clientId) {
             clientWS.send(JSON.stringify(response));
             //console.log('sent back: ' + JSON.stringify(response));
         }
+  
+    } catch (error) {
+        console.log("error with mongodb: " + error);
+        await mongoclient.close();
+    } finally {
+      // Close the MongoDB connection when finished
+      //await mongoclient.close();
+    }
+  }
+
+  async function queryClusters(clientId) {
+    try {
+        /*if (!mongoclient.isConnected()) {
+            console.log('mongodb not connected!');
+            connectMongoDB();
+        } else {*/
+            const database = mongoclient.db('vbs2023'); // Replace with your database name
+            const collection = database.collection('clusters'); // Replace with your collection name
+        
+            const cursor = collection.find().sort({'members': -1});
+            let results = [];
+            await cursor.forEach(document => {
+                results.push(document);
+            });
+            
+            let response = { "type": "concepts", "num": results.length, "results": results };
+            clientWS = clients.get(clientId);
+            clientWS.send(JSON.stringify(response));
+            //console.log('sent back: ' + JSON.stringify(response));
+        //}
   
     } catch (error) {
         console.log("error with mongodb: " + error);
