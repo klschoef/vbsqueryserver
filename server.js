@@ -88,13 +88,15 @@ wss.on('connection', (ws) => {
 
         if (msg.content.type === 'clusters') {
             queryClusters(clientId);
+        } else if (msg.content.type === 'videoinfo') {
+            getVideoInfo(clientId, msg.content);
+        } else if (msg.content.type === 'videosummaries') {
+            getVideoSummaries(clientId, msg.content);
         } else {
-
             //check CLIPserver connection
             if (clipWebSocket === null) {
                 console.log('clipWebSocket is null');
             } else {
-                
                 // Append jsonString to the file
                 msg.clientId = clientId; //give client a unique id on the node server (and set it for every msg)
                 fs.appendFile(LOGFILE, JSON.stringify(msg), function (err) {
@@ -165,6 +167,10 @@ wss.on('connection', (ws) => {
                             }
                         });
                     }
+                } else if (msg.content.type === 'similarityquery') {
+                    combineCLIPWithMongo = false;
+                    filterCLIPResultsByDate = false;
+                    clipWebSocket.send(JSON.stringify(msg));
                 } else if (msg.content.type === 'metadataquery') {
                     queryImage(msg.content.imagepath).then((queryResults) => {
                         console.log("query finished");
@@ -204,7 +210,6 @@ wss.on('connection', (ws) => {
         //mongoclient.close();
     });
 });
-
 
 
 //////////////////////////////////////////////////////////////////
@@ -804,31 +809,79 @@ async function queryObjects(clientId) {
 
   async function queryClusters(clientId) {
     try {
-        /*if (!mongoclient.isConnected()) {
-            console.log('mongodb not connected!');
-            connectMongoDB();
-        } else {*/
-            const database = mongoclient.db('vbs2023'); // Replace with your database name
-            const collection = database.collection('clusters'); // Replace with your collection name
+        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const collection = database.collection('clusters'); // Replace with your collection name
+    
+        const cursor = collection.find().sort({'members': -1});
+        let results = [];
+        await cursor.forEach(document => {
+            results.push(document);
+        });
         
-            const cursor = collection.find().sort({'members': -1});
-            let results = [];
-            await cursor.forEach(document => {
-                results.push(document);
-            });
-            
-            let response = { "type": "concepts", "num": results.length, "results": results };
-            clientWS = clients.get(clientId);
-            clientWS.send(JSON.stringify(response));
-            //console.log('sent back: ' + JSON.stringify(response));
-        //}
-  
+        let response = { "type": "concepts", "num": results.length, "results": results };
+        clientWS = clients.get(clientId);
+        clientWS.send(JSON.stringify(response));
+        //console.log('sent back: ' + JSON.stringify(response));
     } catch (error) {
+        console.log("error with mongodb: " + error);
+        await mongoclient.close();
+    }
+  }
+
+
+async function getVideoInfo(clientId, queryInput) {
+    try {
+        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const collection = database.collection('videos'); // Replace with your collection name
+
+        let query = {};
+        query = {'videoid': queryInput.videoid};
+
+        const cursor = collection.find(query);
+        let results = [];
+        await cursor.forEach(document => {
+            results.push(document);
+        });
+
+        let response = { "type": "videoinfo", "content": results };
+        clientWS = clients.get(clientId);
+        clientWS.send(JSON.stringify(response));
+        //console.log('sent back: ' + JSON.stringify(response))
+
+    }  catch (error) {
         console.log("error with mongodb: " + error);
         await mongoclient.close();
     } finally {
       // Close the MongoDB connection when finished
       //await mongoclient.close();
     }
-  }
+}
+
+async function getVideoSummaries(clientId, queryInput) {
+    try {
+        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const collection = database.collection('videos'); // Replace with your collection name
+
+        let query = {};
+        query = {'videoid': queryInput.videoid};
+
+        const cursor = collection.find(query).project({_id:0,videoid:1,summaries:1});
+        let results = [];
+        await cursor.forEach(document => {
+            results.push(document);
+        });
+
+        let response = { "type": "videosummaries", "content": results };
+        clientWS = clients.get(clientId);
+        clientWS.send(JSON.stringify(response));
+        console.log('sent back: ' + JSON.stringify(response))
+
+    }  catch (error) {
+        console.log("error with mongodb: " + error);
+        await mongoclient.close();
+    } finally {
+      // Close the MongoDB connection when finished
+      //await mongoclient.close();
+    }
+}
 
