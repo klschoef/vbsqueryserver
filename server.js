@@ -171,6 +171,10 @@ wss.on('connection', (ws) => {
                     combineCLIPWithMongo = false;
                     filterCLIPResultsByDate = false;
                     clipWebSocket.send(JSON.stringify(msg));
+                } else if (msg.content.type === 'file-similarityquery') {
+                    combineCLIPWithMongo = false;
+                    filterCLIPResultsByDate = false;
+                    clipWebSocket.send(JSON.stringify(msg));
                 } else if (msg.content.type === 'metadataquery') {
                     queryImage(msg.content.imagepath).then((queryResults) => {
                         console.log("query finished");
