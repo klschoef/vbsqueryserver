@@ -785,36 +785,7 @@ async function queryObjects(clientId) {
     }
   }
 
-  async function queryTexts(clientId) {
-    try {
-        if (!mongoclient.isConnected()) {
-            console.log('mongodb not connected!');
-            connectMongoDB();
-        } else {
-            const database = mongoclient.db('vbs2023'); // Replace with your database name
-            const collection = database.collection('texts'); // Replace with your collection name
-        
-            const cursor = collection.find({},{name:1}).sort({name: 1});
-            let results = [];
-            await cursor.forEach(document => {
-                results.push(document);
-            });
-            
-            let response = { "type": "texts", "num": results.length, "results": results };
-            clientWS = clients.get(clientId);
-            clientWS.send(JSON.stringify(response));
-            //console.log('sent back: ' + JSON.stringify(response));
-        }
   
-    } catch (error) {
-        console.log("error with mongodb: " + error);
-        await mongoclient.close();
-    } finally {
-      // Close the MongoDB connection when finished
-      //await mongoclient.close();
-    }
-  }
-
   async function queryClusters(clientId) {
     try {
         const database = mongoclient.db('vbs2023'); // Replace with your database name
@@ -893,94 +864,19 @@ async function getVideoSummaries(clientId, queryInput) {
 async function queryOCRText(clientId, queryInput) {
     try {
         const database = mongoclient.db('vbs2023'); // Replace with your database name
-        const collection = database.collection('videos'); // Replace with your collection name
+        const collection = database.collection('texts'); // Replace with your collection name
 
-        /*let query = {};
-        query = {'texts': {'$elemMatch': {
-            'text': {
-                '$regex': queryInput.query,
-                '$options': 'i'
-            }
-        }}};*/
+        // Find the document with the matching text
+        const document = await collection.findOne({ text: queryInput.query });
+        let response = { "type": "ocr-text", "num": 0, "results": [], "scores": [], "dataset": "v3c" };
+        if (document) {
+            response.num = document.frames.length;
+            response.results = document.frames;
+            response.scores  = new Array(document.frames.length).fill(1);
+        }
 
-        var queryString = queryInput.query; // Replace this with the text you're searching for.
-
-        // ...
-        const PAGE_SIZE = 100;
-        const SKIP = 0; // Start from the first document
-
-        const cursor = collection.aggregate([
-            {
-                $match: {
-                    "texts.text": {
-                        $regex: queryString,
-                        $options: 'i'
-                    }
-                }
-            },
-            {
-                $project: {
-                    "keyframes": "$shots.keyframe", 
-                    "videoid": 1 //include videoid for later use
-                }
-            },
-            {
-                $unwind: "$keyframes"
-            },
-            {
-                $addFields: {
-                  "keyframes": {
-                    $concat: ["$videoid", "/", "$keyframes"]  // Concatenate videoid and keyframe
-                  }
-                }
-            },
-            {
-                $skip: SKIP
-            },
-            {
-                $limit: PAGE_SIZE
-            },
-            {
-                $group: {
-                    _id: null,
-                    results: {
-                        $push: "$keyframes"
-                    }
-                }
-            }, 
-            {
-                $facet: {
-                  allKeyframes: [
-                    { 
-                      $group: {
-                        _id: null,
-                        keyframes: {
-                          $push: "$keyframes"
-                        }
-                      }
-                    }
-                  ],
-                  totalResults: [
-                    {
-                      $count: "count"
-                    }
-                  ]
-                }
-              }
-        ]);
-
-
-
-        //const cursor = collection.find(query).project({_id:0,videoid:1});
-        let results = [];
-        await cursor.forEach(document => {
-            results.push(document);
-        });
-
-        let response = { "type": "ocr-text", "content": results };
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
-        console.log('sent back: ' + JSON.stringify(response))
 
     }  catch (error) {
         console.log("error with mongodb: " + error);
