@@ -993,7 +993,7 @@ async function queryCluster(clientId, queryInput) {
         let results = [];
         let scores = [];
         if (document) {
-            for(const member of document.memberss) {
+            for(const member of document.members) {
                 results.push(member);
                 scores.push(1);
             }
