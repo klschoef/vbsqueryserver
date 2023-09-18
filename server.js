@@ -966,7 +966,7 @@ async function queryClusters(clientId) {
         const collection = database.collection('clusters'); // Replace with your collection name
 
         // Fetch the clusters and sort them by the size of 'memberss' array (in descending order)
-        const cursor = collection.find({}).sort({ "members": -1 }).project({'cluster_id': 1, 'name': 1, 'count': 1});
+        const cursor = collection.find({}).sort({ "count": -1 }).project({'cluster_id': 1, 'name': 1, 'count': 1});
         
         // Converting cursor to array (You can also use forEach to avoid loading all into memory)
         const clusters = await cursor.toArray();
