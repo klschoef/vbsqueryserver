@@ -94,6 +94,14 @@ wss.on('connection', (ws) => {
             getVideoSummaries(clientId, msg.content);
         } else if (msg.content.type === 'ocr-text') {
             queryOCRText(clientId, msg.content);
+        } else if (msg.content.type === 'metadata') {
+            queryMetadata(clientId, msg.content);
+        } else if (msg.content.type === 'videoid') {
+            queryVideoID(clientId, msg.content);
+        } else if (msg.content.type === 'clusters') {
+            queryClusters(clientId);
+        } else if (msg.content.type === 'cluster') {
+            queryCluster(clientId, msg.content);
         } else {
             //check CLIPserver connection
             if (clipWebSocket === null) {
@@ -867,13 +875,131 @@ async function queryOCRText(clientId, queryInput) {
         const collection = database.collection('texts'); // Replace with your collection name
 
         // Find the document with the matching text
-        const document = await collection.findOne({ text: queryInput.query });
+        //const document = await collection.findOne({ text: {"$regex": queryInput.query, "$options": "i" }});
+        const document = await collection.findOne({ text: {$regex: new RegExp(queryInput.query, "i")} });
         let response = { "type": "ocr-text", "num": 0, "results": [], "scores": [], "dataset": "v3c" };
         if (document) {
             response.num = document.frames.length;
             response.results = document.frames;
             response.scores  = new Array(document.frames.length).fill(1);
         }
+
+        clientWS = clients.get(clientId);
+        clientWS.send(JSON.stringify(response));
+
+    }  catch (error) {
+        console.log("error with mongodb: " + error);
+        await mongoclient.close();
+    } 
+}
+
+async function queryVideoID(clientId, queryInput) {
+    try {
+        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const collection = database.collection('videos'); // Replace with your collection name
+
+        // Find the document with the matching text
+        const document = await collection.findOne({ videoid: queryInput.query });
+        let results = [];
+        let scores = [];
+        if (document) {
+            for(const shot of document.shots) {
+                results.push(document.videoid + '/' + shot.keyframe);
+                scores.push(1);
+            }
+        }
+
+        let response = { "type": "videoid", "num": results.length, "results": results, "scores": scores, "dataset": "v3c" };
+        
+
+        clientWS = clients.get(clientId);
+        clientWS.send(JSON.stringify(response));
+
+    }  catch (error) {
+        console.log("error with mongodb: " + error);
+        await mongoclient.close();
+    } 
+}
+
+async function queryMetadata(clientId, queryInput) {
+    try {
+        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const collection = database.collection('videos'); // Replace with your collection name
+
+        const regexQuery = new RegExp(queryInput.query, "i"); // Create a case-insensitive regular expression
+
+        const cursor = await collection.find({
+            $or: [
+                { description: { $regex: regexQuery } },
+                { "speech.text": { $regex: regexQuery } },
+                { "speech.keywords": { $regex: regexQuery } },
+                { channel: { $regex: regexQuery } },
+                { title: { $regex: regexQuery } },
+                { tags: { $regex: regexQuery } }
+            ]
+        });
+        
+        let results = [];
+        let scores = [];
+        await cursor.forEach(document => {
+            for(const shot of document.shots) {
+                results.push(document.videoid + '/' + shot.keyframe);
+                scores.push(1);
+            }
+        });
+        
+
+        let response = { "type": "metadata", "num": results.length, "results": results, "scores": scores, "dataset": "v3c" };
+
+        clientWS = clients.get(clientId);
+        clientWS.send(JSON.stringify(response));
+
+    }  catch (error) {
+        console.log("error with mongodb: " + error);
+        await mongoclient.close();
+    } 
+}
+
+async function queryClusters(clientId) {
+    try {
+        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const collection = database.collection('clusters'); // Replace with your collection name
+
+        // Fetch the clusters and sort them by the size of 'memberss' array (in descending order)
+        const cursor = collection.find({}).sort({ "memberss": -1 }).project({'cluster_id': 1});
+        
+        // Converting cursor to array (You can also use forEach to avoid loading all into memory)
+        const clusters = await cursor.toArray();
+
+        let response = { "type": "clusters", "num": clusters.length, "results": clusters, "scores": new Array(clusters.length).fill(1), "dataset": "v3c" };
+
+        clientWS = clients.get(clientId);
+        clientWS.send(JSON.stringify(response));
+
+    }  catch (error) {
+        console.log("error with mongodb: " + error);
+        await mongoclient.close();
+    } 
+}
+
+
+async function queryCluster(clientId, queryInput) {
+    try {
+        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const collection = database.collection('clusters'); // Replace with your collection name
+
+        // Fetch the clusters and sort them by the size of 'memberss' array (in descending order)
+        const document = await collection.findOne({'cluster_id': queryInput.query});
+        let results = [];
+        let scores = [];
+        if (document) {
+            for(const member of document.memberss) {
+                results.push(member);
+                scores.push(1);
+            }
+        }
+
+        let response = { "type": "cluster", "num": results.length, "results": results, "scores": scores, "dataset": "v3c" };
 
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
