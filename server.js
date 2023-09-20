@@ -96,6 +96,8 @@ wss.on('connection', (ws) => {
             queryOCRText(clientId, msg.content);
         } else if (msg.content.type === 'metadata') {
             queryMetadata(clientId, msg.content);
+        } else if (msg.content.type === 'speech') {
+            querySpeech(clientId, msg.content);
         } else if (msg.content.type === 'videoid') {
             queryVideoID(clientId, msg.content);
         } else if (msg.content.type === 'clusters') {
@@ -877,10 +879,11 @@ async function queryOCRText(clientId, queryInput) {
         // Find the document with the matching text
         //const document = await collection.findOne({ text: {"$regex": queryInput.query, "$options": "i" }});
         const document = await collection.findOne({ text: {$regex: new RegExp(queryInput.query, "i")} });
-        let response = { "type": "ocr-text", "num": 0, "results": [], "scores": [], "dataset": "v3c" };
+        let response = { "type": "ocr-text", "num": 0, "results": [], "totalresults": 0, "scores": [], "dataset": "v3c" };
         if (document) {
             response.num = document.frames.length;
             response.results = document.frames;
+            response.totalresults = response.num;
             response.scores  = new Array(document.frames.length).fill(1);
         }
 
@@ -909,7 +912,7 @@ async function queryVideoID(clientId, queryInput) {
             }
         }
 
-        let response = { "type": "videoid", "num": results.length, "results": results, "scores": scores, "dataset": "v3c" };
+        let response = { "type": "videoid", "num": results.length, "results": results, "totalresults": results.length, "scores": scores, "dataset": "v3c" };
         
 
         clientWS = clients.get(clientId);
@@ -931,8 +934,6 @@ async function queryMetadata(clientId, queryInput) {
         const cursor = await collection.find({
             $or: [
                 { description: { $regex: regexQuery } },
-                { "speech.text": { $regex: regexQuery } },
-                { "speech.keywords": { $regex: regexQuery } },
                 { channel: { $regex: regexQuery } },
                 { title: { $regex: regexQuery } },
                 { tags: { $regex: regexQuery } }
@@ -949,7 +950,42 @@ async function queryMetadata(clientId, queryInput) {
         });
         
 
-        let response = { "type": "metadata", "num": results.length, "results": results, "scores": scores, "dataset": "v3c" };
+        let response = { "type": "metadata", "num": results.length, "results": results, "totalresults": results.length, "scores": scores, "dataset": "v3c" };
+
+        clientWS = clients.get(clientId);
+        clientWS.send(JSON.stringify(response));
+
+    }  catch (error) {
+        console.log("error with mongodb: " + error);
+        await mongoclient.close();
+    } 
+}
+
+async function querySpeech(clientId, queryInput) {
+    try {
+        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const collection = database.collection('videos'); // Replace with your collection name
+
+        const regexQuery = new RegExp(queryInput.query, "i"); // Create a case-insensitive regular expression
+
+        const cursor = await collection.find({
+            $or: [
+                { "speech.text": { $regex: regexQuery } },
+                { "speech.keywords": { $regex: regexQuery } },
+            ]
+        });
+        
+        let results = [];
+        let scores = [];
+        await cursor.forEach(document => {
+            for(const shot of document.shots) {
+                results.push(document.videoid + '/' + shot.keyframe);
+                scores.push(1);
+            }
+        });
+        
+
+        let response = { "type": "speech", "num": results.length, "results": results, "totalresults": results.length, "scores": scores, "dataset": "v3c" };
 
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
