@@ -880,6 +880,7 @@ async function queryOCRText(clientId, queryInput) {
         //const document = await collection.findOne({ text: {"$regex": queryInput.query, "$options": "i" }});
         const document = await collection.findOne({ text: {$regex: new RegExp(queryInput.query, "i")} });
         let response = { "type": "ocr-text", "num": 0, "results": [], "totalresults": 0, "scores": [], "dataset": "v3c" };
+        
         if (document) {
             response.num = document.frames.length;
             response.results = document.frames;
@@ -902,18 +903,34 @@ async function queryVideoID(clientId, queryInput) {
         const collection = database.collection('videos'); // Replace with your collection name
 
         // Find the document with the matching text
-        const document = await collection.findOne({ videoid: queryInput.query });
-        let results = [];
+        const cursor = await collection.find({ videoid: { $regex: queryInput.query, $options: "i" } });
+        
+        let response = { "type": "videoid", "num": 0, "results": [], "totalresults": 0, "scores": [], "dataset": "v3c" };
+        
+        /*let results = [];
         let scores = [];
         if (document) {
             for(const shot of document.shots) {
                 results.push(document.videoid + '/' + shot.keyframe);
                 scores.push(1);
             }
-        }
-
-        let response = { "type": "videoid", "num": results.length, "results": results, "totalresults": results.length, "scores": scores, "dataset": "v3c" };
+        }*/
+        if (cursor) {
+            let results = [];
+            let scores = [];
+            await cursor.forEach(document => {
+                for(const shot of document.shots) {
+                    results.push(document.videoid + '/' + shot.keyframe);
+                    scores.push(1);
+                }
+            });
+            
+            response.num = results.length;
+            response.totalresults = results.length;
+            response.scores = scores;
+            response.results = results;
         
+        }
 
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
