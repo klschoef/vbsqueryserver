@@ -21,7 +21,7 @@ connectMongoDB();
 
 // Variables to store the parameter values
 let text, concept, object, place, year, month, day, weekday, filename, similarto;
-let combineCLIPWithMongo = false, filterCLIPResultsByDate = false, queryMode = 'all';
+let combineCLIPWithMongo = false, filterCLIPResultsByDate = false, queryMode = 'all', combineCLIPwithCLIP = 0;
 
 //////////////////////////////////////////////////////////////////
 // Connection to client
@@ -127,6 +127,7 @@ wss.on('connection', (ws) => {
                     clipQuery = parseParameters(msg.content.query)
                     combineCLIPWithMongo = false;
                     filterCLIPResultsByDate = false;
+                    combineCLIPwithCLIP = 0;
 
                     //special hack for file-similarity
                     /*if (similarto !== '') {
@@ -146,8 +147,27 @@ wss.on('connection', (ws) => {
 
                         console.log('sending to CLIP server: "%s" len=%d content-len=%d (rpp=%d, max=%d) - %d %d %d', clipQuery, clipQuery.length, msg.content.query.length, msg.content.resultsperpage, msg.content.maxresults, clipQuery.length, msg.content.query.trim().length, lenBefore);
                         
+                        let clipQueries = Array();
+                        let tmpClipQuery = clipQuery;
+                        if (tmpClipQuery.includes('<')) {
+                            let idxS = -1;
+                            do {
+                                idxS = tmpClipQuery.indexOf('<');
+                                if (idxS < -1) {
+                                    clipQueries.push(tmpClipQuery.substring(0,idxS));
+                                    tmpClipQuery = tmpClipQuery.substring(idxS+1);
+                                }
+                            } while (idxS < -1);
 
-                        if (isOnlyDateFilter() && queryMode !== 'distinctive' && queryMode !== 'moredistinctive') {
+                        }
+
+                        if (clipQueries.length > 0) {
+                            combineCLIPwithCLIP = clipQueries.length;
+                            for (let i=0; i < clipQueries.length; i++) {
+                                clipWebSocket.send(clipQueries[i]);
+                            }
+                            clipQueries = Array();
+                        } else if (isOnlyDateFilter() && queryMode !== 'distinctive' && queryMode !== 'moredistinctive') {
                             //C L I P   Q U E R Y   +   F I L T E R
                             filterCLIPResultsByDate = true;
                             //msg.content.resultsperpage = msg.content.maxresults;
@@ -326,6 +346,7 @@ function connectToCLIPServer() {
         
         const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         
+        pendingCLIPResults = Array();
 
 
         clipWebSocket.on('message', (message) => {
@@ -403,6 +424,41 @@ function connectToCLIPServer() {
                 });
 
             } 
+            else if (combineCLIPwithCLIP > 0) {
+                pendingCLIPResults.push(msg);
+                combineCLIPwithCLIP--;
+                if (combineCLIPwithCLIP == 0) {
+                    let jointResults = Array();
+                    let jointResultsIdx = Array();
+                    for (let r = 1; r < pendingCLIPResults.length; r++) {
+                        let tresPrev = pendingCLIPResults[r-1].results;
+                        let tres = pendingCLIPResults[r].results;
+                        let tresIdxPrev = pendingCLIPResults[r-1].resultsidx;
+                        let tresIdx = pendingCLIPResults[r].resultsidx;
+                        for (let i = 0; i < tres.length; i++) {
+                            let vid = parseInt(tres[i].substring(0,5));
+                            let frame = parseInt(tres[i].substring(6,tres[i].indexOf('.')));
+                            for (let j = 0; j < tresPrev.length; j++) {
+                                let vidP = parseInt(tres[j].substring(0,5));
+                                let frameP = parseInt(tres[j].substring(6,tres[i].indexOf('.')));
+
+                                if (vid == vidP && frame > frameP) {
+                                    jointResults.push(tres[j]);
+                                    jointResultsIdx.push(tresIdx[j])
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    msg.results = jointResults;
+                    msg.resultsidx = jointResultsIdx;
+                    msg.totalresults = jointResults.length;
+                    msg.num = jointResults.length;
+                    console.log('forwarding %d joint results to client %s', msg.totalresults, clientId);
+                    clientWS.send(JSON.stringify(msg));
+                }
+                
+            }
             else {
 
                 if (filterCLIPResultsByDate === true || queryMode !== 'all') {
