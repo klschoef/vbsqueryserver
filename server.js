@@ -153,18 +153,26 @@ wss.on('connection', (ws) => {
                             let idxS = -1;
                             do {
                                 idxS = tmpClipQuery.indexOf('<');
-                                if (idxS < -1) {
+                                if (idxS > -1) {
                                     clipQueries.push(tmpClipQuery.substring(0,idxS));
                                     tmpClipQuery = tmpClipQuery.substring(idxS+1);
+                                } else {
+                                    clipQueries.push(tmpClipQuery); //last one
                                 }
-                            } while (idxS < -1);
-
+                            } while (idxS > -1);
+                            console.log('found ' + clipQueries.length + ' temporal queries:');
+                            for (let i=0; i < clipQueries.length; i++) {
+                                console.log(clipQueries[i]);
+                            }
                         }
 
                         if (clipQueries.length > 0) {
                             combineCLIPwithCLIP = clipQueries.length;
                             for (let i=0; i < clipQueries.length; i++) {
-                                clipWebSocket.send(clipQueries[i]);
+                                let tmsg = msg;
+                                tmsg.content.query = clipQueries[i];
+                                tmsg.content.resultsperpage = tmsg.content.maxresults;
+                                clipWebSocket.send(JSON.stringify(tmsg));
                             }
                             clipQueries = Array();
                         } else if (isOnlyDateFilter() && queryMode !== 'distinctive' && queryMode !== 'moredistinctive') {
@@ -430,21 +438,24 @@ function connectToCLIPServer() {
                 if (combineCLIPwithCLIP == 0) {
                     let jointResults = Array();
                     let jointResultsIdx = Array();
+                    let jointScores = Array();
                     for (let r = 1; r < pendingCLIPResults.length; r++) {
                         let tresPrev = pendingCLIPResults[r-1].results;
                         let tres = pendingCLIPResults[r].results;
-                        let tresIdxPrev = pendingCLIPResults[r-1].resultsidx;
                         let tresIdx = pendingCLIPResults[r].resultsidx;
+                        let tresScores = pendingCLIPResults[r].scores;
                         for (let i = 0; i < tres.length; i++) {
-                            let vid = parseInt(tres[i].substring(0,5));
-                            let frame = parseInt(tres[i].substring(6,tres[i].indexOf('.')));
+                            let vid = tres[i].substring(0,11);
+                            let frame = parseInt(tres[i].substring(12,tres[i].indexOf('.')));
                             for (let j = 0; j < tresPrev.length; j++) {
-                                let vidP = parseInt(tres[j].substring(0,5));
-                                let frameP = parseInt(tres[j].substring(6,tres[i].indexOf('.')));
+                                let vidP = tresPrev[j].substring(0,11);
+                                let frameP = parseInt(tresPrev[j].substring(12,tres[i].indexOf('.')));
 
                                 if (vid == vidP && frame > frameP) {
-                                    jointResults.push(tres[j]);
-                                    jointResultsIdx.push(tresIdx[j])
+                                    jointResults.push(tres[i]);
+                                    jointResultsIdx.push(tresIdx[i]);
+                                    jointScores.push(tresScores[i]);
+                                    //console.log('found: ' + tres[i] + ': ' + vid + ' ' + frame + " > " + vidP + " " + frameP);
                                     break;
                                 }
                             }
@@ -455,6 +466,7 @@ function connectToCLIPServer() {
                     msg.totalresults = jointResults.length;
                     msg.num = jointResults.length;
                     console.log('forwarding %d joint results to client %s', msg.totalresults, clientId);
+                    pendingCLIPResults = Array();
                     clientWS.send(JSON.stringify(msg));
                 }
                 
