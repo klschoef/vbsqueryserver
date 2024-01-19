@@ -91,7 +91,7 @@ wss.on('connection', (ws) => {
         } else if (msg.content.type === 'videoinfo') {
             getVideoInfo(clientId, msg.content);
         } else if (msg.content.type === 'videofps') {
-            getVideoFPS(clientId, msg.content);
+            getVideoFPS(clientId, msg.content, msg.correlationId);
         } else if (msg.content.type === 'videosummaries') {
             getVideoSummaries(clientId, msg.content);
         } else if (msg.content.type === 'ocr-text') {
@@ -887,7 +887,7 @@ async function queryClusters(clientId) {
     }
 }
 
-async function getVideoFPS(clientId, queryInput) {
+async function getVideoFPS(clientId, queryInput, correlationId) {
     try {
         console.log('received '+ JSON.stringify(queryInput));
         const database = mongoclient.db('vbs2023'); // Replace with your database name
@@ -904,7 +904,7 @@ async function getVideoFPS(clientId, queryInput) {
             results.push(document);
         });
 
-        let response = { "type": "videofps", "content": results, "correlationId": queryInput.correlationId };
+        let response = { "type": "videofps", "content": results, "correlationId": correlationId };
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
         console.log('sent back fps info: ' + JSON.stringify(response))
