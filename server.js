@@ -90,6 +90,8 @@ wss.on('connection', (ws) => {
             queryClusters(clientId);
         } else if (msg.content.type === 'videoinfo') {
             getVideoInfo(clientId, msg.content);
+        } else if (msg.content.type === 'videofps') {
+            getVideoFPS(clientId, msg.content);
         } else if (msg.content.type === 'videosummaries') {
             getVideoSummaries(clientId, msg.content);
         } else if (msg.content.type === 'ocr-text') {
@@ -803,7 +805,7 @@ async function queryObjects(clientId) {
     }
   }
 
-  async function queryConcepts(clientId) {
+async function queryConcepts(clientId) {
     try {
         if (!mongoclient.isConnected()) {
             console.log('mongodb not connected!');
@@ -831,9 +833,9 @@ async function queryObjects(clientId) {
       // Close the MongoDB connection when finished
       //await mongoclient.close();
     }
-  }
+}
 
-  async function queryPlaces(clientId) {
+async function queryPlaces(clientId) {
     try {
         if (!mongoclient.isConnected()) {
             console.log('mongodb not connected!');
@@ -861,10 +863,10 @@ async function queryObjects(clientId) {
       // Close the MongoDB connection when finished
       //await mongoclient.close();
     }
-  }
+}
 
   
-  async function queryClusters(clientId) {
+async function queryClusters(clientId) {
     try {
         const database = mongoclient.db('vbs2023'); // Replace with your database name
         const collection = database.collection('clusters'); // Replace with your collection name
@@ -883,7 +885,37 @@ async function queryObjects(clientId) {
         console.log("error with mongodb: " + error);
         await mongoclient.close();
     }
-  }
+}
+
+async function getVideoFPS(clientId, queryInput) {
+    try {
+        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const collection = database.collection('videos'); // Replace with your collection name
+
+        let projection = {fps: 1, duration: 1};
+
+        let query = {};
+        query = {'videoid': queryInput.videoid};
+
+        const cursor = collection.find(query, {projection: projection});
+        let results = [];
+        await cursor.forEach(document => {
+            results.push(document);
+        });
+
+        let response = { "type": "videofps", "content": results };
+        clientWS = clients.get(clientId);
+        clientWS.send(JSON.stringify(response));
+        //console.log('sent back: ' + JSON.stringify(response))
+
+    }  catch (error) {
+        console.log("error with mongodb: " + error);
+        await mongoclient.close();
+    } finally {
+      // Close the MongoDB connection when finished
+      //await mongoclient.close();
+    }
+}
 
 
 async function getVideoInfo(clientId, queryInput) {
