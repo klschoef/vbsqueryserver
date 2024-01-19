@@ -889,7 +889,7 @@ async function queryClusters(clientId) {
 
 async function getVideoFPS(clientId, queryInput, correlationId) {
     try {
-        console.log('received '+ JSON.stringify(queryInput));
+        //console.log('received '+ JSON.stringify(queryInput));
         const database = mongoclient.db('vbs2023'); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
 
@@ -907,7 +907,7 @@ async function getVideoFPS(clientId, queryInput, correlationId) {
         let response = { "type": "videofps", "content": results, "correlationId": correlationId };
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
-        console.log('sent back fps info: ' + JSON.stringify(response))
+        //console.log('sent back fps info: ' + JSON.stringify(response))
 
     }  catch (error) {
         console.log("error with mongodb: " + error);
