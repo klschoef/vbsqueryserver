@@ -904,7 +904,7 @@ async function getVideoFPS(clientId, queryInput, correlationId) {
             results.push(document);
         });
 
-        let response = { "type": "videofps", "fps": results[0].fps, "duration": results[0],duration, "correlationId": correlationId };
+        let response = { "type": "videofps", "fps": results[0].fps, "duration": results[0].duration, "correlationId": correlationId };
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
         //console.log('sent back fps info: ' + JSON.stringify(response))
