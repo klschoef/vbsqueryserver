@@ -462,7 +462,7 @@ function handleCLIPResponse(message) {
         console.log('combined query');
         let combinedResults = [];
 
-        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
         var { query, projection } = getMongoQuery(year, month, day, weekday, text, concept, object, place, filename); 
         console.log('(1) mongodb query: %s', JSON.stringify(query));
@@ -822,7 +822,7 @@ async function queryImage(url) {
             console.log('mongodb not connected!');
             connectMongoDB();
         } else {
-            const database = mongoclient.db('vbs2023'); // Replace with your database name
+            const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
             const collection = database.collection('images'); // Replace with your collection name
         
             let query = { "filepath": url }; 
@@ -859,7 +859,7 @@ async function queryObjects(clientId) {
             console.log('mongodb not connected!');
             connectMongoDB();
         } else {
-            const database = mongoclient.db('vbs2023'); // Replace with your database name
+            const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
             const collection = database.collection('objects'); // Replace with your collection name
         
             const cursor = collection.find({},{name:1}).sort({name: 1});
@@ -889,7 +889,7 @@ async function queryConcepts(clientId) {
             console.log('mongodb not connected!');
             connectMongoDB();
         } else {
-            const database = mongoclient.db('vbs2023'); // Replace with your database name
+            const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
             const collection = database.collection('concepts'); // Replace with your collection name
         
             const cursor = collection.find({},{name:1}).sort({name: 1});
@@ -919,7 +919,7 @@ async function queryPlaces(clientId) {
             console.log('mongodb not connected!');
             connectMongoDB();
         } else {
-            const database = mongoclient.db('vbs2023'); // Replace with your database name
+            const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
             const collection = database.collection('places'); // Replace with your collection name
         
             const cursor = collection.find({},{name:1}).sort({name: 1});
@@ -946,7 +946,7 @@ async function queryPlaces(clientId) {
   
 async function queryClusters(clientId) {
     try {
-        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('clusters'); // Replace with your collection name
     
         const cursor = collection.find().sort({'members': -1});
@@ -968,7 +968,7 @@ async function queryClusters(clientId) {
 async function getVideoFPS(clientId, queryInput, correlationId) {
     try {
         //console.log('received '+ JSON.stringify(queryInput));
-        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
 
         let projection = {fps: 1, duration: 1};
@@ -999,7 +999,7 @@ async function getVideoFPS(clientId, queryInput, correlationId) {
 
 async function getVideoInfo(clientId, queryInput) {
     try {
-        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
 
         let query = {};
@@ -1027,7 +1027,7 @@ async function getVideoInfo(clientId, queryInput) {
 
 async function getVideoSummaries(clientId, queryInput) {
     try {
-        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
 
         let query = {};
@@ -1052,7 +1052,7 @@ async function getVideoSummaries(clientId, queryInput) {
 
 async function queryOCRText(clientId, queryInput) {
     try {
-        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('texts'); // Replace with your collection name
 
         // Find the document with the matching text
@@ -1078,7 +1078,7 @@ async function queryOCRText(clientId, queryInput) {
 
 async function queryVideoID(clientId, queryInput) {
     try {
-        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
 
         // Find the document with the matching text
@@ -1122,7 +1122,7 @@ async function queryVideoID(clientId, queryInput) {
 
 async function queryMetadata(clientId, queryInput) {
     try {
-        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
 
         const regexQuery = new RegExp(queryInput.query, "i"); // Create a case-insensitive regular expression
@@ -1159,7 +1159,7 @@ async function queryMetadata(clientId, queryInput) {
 
 async function querySpeech(clientId, queryInput) {
     try {
-        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
 
         const regexQuery = new RegExp(queryInput.query, "i"); // Create a case-insensitive regular expression
@@ -1194,7 +1194,7 @@ async function querySpeech(clientId, queryInput) {
 
 async function queryClusters(clientId) {
     try {
-        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('clusters'); // Replace with your collection name
 
         // Fetch the clusters and sort them by the size of 'memberss' array (in descending order)
@@ -1217,7 +1217,7 @@ async function queryClusters(clientId) {
 
 async function queryCluster(clientId, queryInput) {
     try {
-        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('clusters'); // Replace with your collection name
 
         // Fetch the clusters and sort them by the size of 'memberss' array (in descending order)
