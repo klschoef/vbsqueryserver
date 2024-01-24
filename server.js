@@ -9,10 +9,17 @@ const LOGFILE = 'vbsqueryserverlog.json'
 
 const DISTINCTIVE_L2DIST1 = 10.0;
 const DISTINCTIVE_L2DIST2 = 15.0;
-const CLIPSERVERURL = 'ws://' + config.config_CLIP_SERVER; //'ws://extreme00.itec.aau.at:8002';
-console.log(CLIPSERVERURL);
-const wss = new WebSocket.Server({ noServer: true });
-let clipWebSocket = null;
+const CLIPSERVERURLV3C = 'ws://' + config.config_CLIP_SERVER_V3C; 
+console.log(CLIPSERVERURLV3C);
+const CLIPSERVERURLMKV = 'ws://' + config.config_CLIP_SERVER_MKV; 
+console.log(CLIPSERVERURLMKV);
+const CLIPSERVERURLLHE = 'ws://' + config.config_CLIP_SERVER_LHE; 
+console.log(CLIPSERVERURLLHE);
+
+const wss = new WebSocket.Server({ noServer: true }); //web socket to client
+let clipWebSocketV3C = null;
+let clipWebSocketMKV = null;
+let clipWebSocketLHE = null;
 
 const mongouri = 'mongodb://' + config.config_MONGODB_SERVER; // Replace with your MongoDB connection string
 const MongoClient = require('mongodb').MongoClient;
@@ -75,9 +82,17 @@ wss.on('connection', (ws) => {
     console.log('client connected: %s', clientId);
 
     //check CLIPserver connection
-    if (clipWebSocket === null) {
-        console.log('clipWebSocket is null, try to re-connect');
-        connectToCLIPServer();
+    if (clipWebSocketV3C === null) {
+        console.log('clipWebSocketV3C is null, try to re-connect');
+        connectToCLIPServerV3C();
+    }
+    if (clipWebSocketMKV === null) {
+        console.log('clipWebSocketMKV is null, try to re-connect');
+        connectToCLIPServerMKV();
+    }
+    if (clipWebSocketLHE === null) {
+        console.log('clipWebSocketLHE is null, try to re-connect');
+        connectToCLIPServerLHE();
     }
 
     ws.on('message', (message) => {
@@ -85,6 +100,15 @@ wss.on('connection', (ws) => {
         // Handle the received message as needed
 
         msg = JSON.parse(message);
+
+        let clipWebSocket = null;
+        if (msg.content.dataset == 'v3c') {
+            clipWebSocket = clipWebSocketV3C;
+        } else if (msg.content.dataset == 'mkv') {
+            clipWebSocket = clipWebSocketMKV;
+        } else if (msg.content.dataset == 'lhe') {
+            clipWebSocket = clipWebSocketLHE;
+        }
 
         if (msg.content.type === 'clusters') {
             queryClusters(clientId);
@@ -328,231 +352,285 @@ function parseParameters(inputString) {
 //////////////////////////////////////////////////////////////////
 // Connection to CLIP server
 //////////////////////////////////////////////////////////////////
-function connectToCLIPServer() {
+function connectToCLIPServerV3C() {
+    let dataset = 'V3C';
     try {
-        console.log('trying to connect to CLIP...');
-        clipWebSocket = new WebSocket(CLIPSERVERURL);
-        console.log('after connection trial')
+        console.log('trying to connect to CLIP ' + dataset + ' ...');
+        clipWebSocketV3C = new WebSocket(CLIPSERVERURLV3C);
 
-        clipWebSocket.on('open', () => {
-            console.log('connected to CLIP server');
-        
-            // Start sending ping messages at the specified interval
-            /*setInterval(() => {
-                if (clipWebSocket.readyState === WebSocket.OPEN) {
-                    let ping = { "content": {"ping":true} }
-                    clipWebSocket.send(JSON.stringify(ping));
-                }
-            }, pingInterval);
-            */
+        clipWebSocketV3C.on('open', () => {
+            console.log('connected to CLIP ' + dataset + ' server');
         })
         
-        clipWebSocket.on('close', (event) => {
+        clipWebSocketV3C.on('close', (event) => {
             // Handle connection closed
-            clipWebSocket.close();
-            clipWebSocket = null;
-            console.log('Connection to CLIP closed', event.code, event.reason);
+            clipWebSocketV3C.close();
+            clipWebSocketV3C = null;
+            console.log('Connection to CLIP ' + dataset + ' closed', event.code, event.reason);
         });
-        
-        const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         
         pendingCLIPResults = Array();
 
-
-        clipWebSocket.on('message', (message) => {
-            
-            //console.log('received from CLIP server: ' + message);
-        
-            msg = JSON.parse(message);
-            numbefore = msg.results.length;
-            clientId = msg.clientId;
-            clientWS = clients.get(clientId);
-
-            console.log('received %s results from CLIP server', msg.num);
-
-            if (combineCLIPWithMongo === true) {
-
-                console.log('combined query');
-                let combinedResults = [];
-
-                const database = mongoclient.db('lsc'); // Replace with your database name
-                const collection = database.collection('images'); // Replace with your collection name
-                var { query, projection } = getMongoQuery(year, month, day, weekday, text, concept, object, place, filename); 
-                console.log('(1) mongodb query: %s', JSON.stringify(query));
-                const sortCriteria = { filepath: 1 }; //-1 for desc
-                collection.find(query, projection).sort(sortCriteria).toArray((error, documents) => {
-                    if (error) {
-                        return;
-                    }
-
-                    console.log('got %d results from mongodb', documents.length);
-                    let processingInfo = {"type": "info",  "num": 1, "totalresults": 1, "message": documents.length + " results in database, now filtering..."};
-                    clientWS.send(JSON.stringify(processingInfo));
-
-                    const dateSet = new Set();
-
-                    for (let i = 0; i < msg.results.length; i++) {
-                        const elem = msg.results[i];
-
-                        for (let k = 0; k < documents.length; k++) {
-                            if (elem === documents[k].filepath) {
-                                if (queryMode === 'first') {
-                                    let eyear = elem.substring(0,4);
-                                    let emonth = elem.substring(4,6);
-                                    let eday = elem.substring(7,9);
-                                    let dateStr = eyear + emonth + eday;
-                                    if (dateSet.has(dateStr) === false) {
-                                        dateSet.add(dateStr);
-                                        combinedResults.push(elem);
-                                    }
-                                } else {
-                                    combinedResults.push(elem);
-                                }
-                                break;
-                            } else if (elem < documents[k].filepath) {
-                                break;
-                            }
-                        }
-                    }
-
-                    msg.results = combinedResults;
-                    msg.totalresults = combinedResults.length;
-                    msg.num = combinedResults.length;
-
-                    console.log('forwarding %d combined results to client %s', msg.totalresults, clientId);
-                    //console.log(JSON.stringify(msg));
-                    clientWS.send(JSON.stringify(msg));
-
-                    // Append jsonString to the file
-                    msg.clientId = clientId;
-                    fs.appendFile(LOGFILE, JSON.stringify(msg), function (err) {
-                        if (err) {
-                            console.log('Error writing file', err)
-                        }
-                    });
-
-                });
-
-            } 
-            else if (combineCLIPwithCLIP > 0) {
-                pendingCLIPResults.push(msg);
-                combineCLIPwithCLIP--;
-                if (combineCLIPwithCLIP == 0) {
-                    let jointResults = Array();
-                    let jointResultsIdx = Array();
-                    let jointScores = Array();
-                    for (let r = 1; r < pendingCLIPResults.length; r++) {
-                        let tresPrev = pendingCLIPResults[r-1].results;
-                        let tres = pendingCLIPResults[r].results;
-                        let tresIdx = pendingCLIPResults[r].resultsidx;
-                        let tresScores = pendingCLIPResults[r].scores;
-                        for (let i = 0; i < tres.length; i++) {
-                            let vid = tres[i].substring(0,11);
-                            let frame = parseInt(tres[i].substring(12,tres[i].indexOf('.')));
-                            for (let j = 0; j < tresPrev.length; j++) {
-                                let vidP = tresPrev[j].substring(0,11);
-                                let frameP = parseInt(tresPrev[j].substring(12,tres[i].indexOf('.')));
-
-                                if (vid == vidP && frame > frameP) {
-                                    jointResults.push(tres[i]);
-                                    jointResultsIdx.push(tresIdx[i]);
-                                    jointScores.push(tresScores[i]);
-                                    //console.log('found: ' + tres[i] + ': ' + vid + ' ' + frame + " > " + vidP + " " + frameP);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    msg.results = jointResults;
-                    msg.resultsidx = jointResultsIdx;
-                    msg.totalresults = jointResults.length;
-                    msg.num = jointResults.length;
-                    console.log('forwarding %d joint results to client %s', msg.totalresults, clientId);
-                    pendingCLIPResults = Array();
-                    clientWS.send(JSON.stringify(msg));
-                }
-                
-            }
-            else {
-
-                if (filterCLIPResultsByDate === true || queryMode !== 'all') {
-            
-                    console.log('filter query');
-                    let ly = year.toString().trim().length;
-                    let lm = month.toString().trim().length;
-                    let ld = day.toString().trim().length;
-                    let lw = weekday.toString().trim().length;
-
-                    const dateSet = new Set();
-                
-                    if (ly > 0 || lm > 0 || ld > 0 || lw > 0 || queryMode !== 'all') {
-                        for (let i = 0; i < msg.results.length; i++) {
-                            const elem = msg.results[i];
-                            let eyear = elem.substring(0,4);
-                            let emonth = elem.substring(4,6);
-                            let eday = elem.substring(7,9);
-                
-                            if (ly > 0 && eyear !== year) {
-                                msg.results.splice(i--, 1);
-                            }
-                            else if (lm > 0 && emonth !== month) {
-                                msg.results.splice(i--, 1);
-                            }
-                            else if (ld > 0 && eday !== day) {
-                                msg.results.splice(i--, 1);
-                            }
-                            else if (queryMode === 'first') {
-                                let dateStr = eyear + emonth + eday;
-                                if (dateSet.has(dateStr)) {
-                                    msg.results.splice(i--,1);
-                                } else {
-                                    dateSet.add(dateStr);
-                                }
-                            }
-                            else if (lw > 0) {
-                                let dstr = eyear + '-' + emonth + '-' + eday;
-                                let edate = new Date(dstr);
-                                let wd = edate.getDay();
-                                
-                                if (weekdays[wd] === weekday) {
-                                    msg.results.splice(i--, 1);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                numafter = msg.results.length;
-                if (numafter !== numbefore) {
-                    msg.totalresults = msg.results.length;
-                    msg.num = msg.results.length;
-                }
-                console.log('forwarding %d results (current before=%d after=%d) to client %s', msg.totalresults, numbefore, numafter, clientId);
-                //console.log(JSON.stringify(msg));
-                clientWS.send(JSON.stringify(msg));
-
-                // Append jsonString to the file
-                msg.clientId = clientId;
-                fs.appendFile(LOGFILE, JSON.stringify(msg), function (err) {
-                    if (err) {
-                        console.log('Error writing file', err)
-                    }
-                });
-            }
-            
-
+        clipWebSocketV3C.on('message', (message) => {
+            handleCLIPResponse(message);
         })
 
-        clipWebSocket.on('error', (event) => {
-            console.log('Connection to CLIP refused');
+        clipWebSocketV3C.on('error', (event) => {
+            console.log('Connection to CLIP ' + dataset + ' refused');
         });
 
     } catch(error) {
-        console.log("Cannot connect to CLIP server");   
+        console.log("Cannot connect to CLIP ' + dataset + ' server");   
     }
 }
 
-connectToCLIPServer();
+function connectToCLIPServerMKV() {
+    let dataset = 'MKV';
+    try {
+        console.log('trying to connect to CLIP ' + dataset + ' ...');
+        clipWebSocketMKV = new WebSocket(CLIPSERVERURLMKV);
+
+        clipWebSocketMKV.on('open', () => {
+            console.log('connected to CLIP ' + dataset + ' server');
+        })
+        
+        clipWebSocketMKV.on('close', (event) => {
+            // Handle connection closed
+            clipWebSocketMKV.close();
+            clipWebSocketMKV = null;
+            console.log('Connection to CLIP ' + dataset + ' closed', event.code, event.reason);
+        });
+        
+        pendingCLIPResults = Array();
+
+        clipWebSocketMKV.on('message', (message) => {
+            handleCLIPResponse(message);
+        })
+
+        clipWebSocketMKV.on('error', (event) => {
+            console.log('Connection to CLIP ' + dataset + ' refused');
+        });
+
+    } catch(error) {
+        console.log("Cannot connect to CLIP ' + dataset + ' server");   
+    }
+}
+
+function connectToCLIPServerLHE() {
+    let dataset = 'LHE';
+    try {
+        console.log('trying to connect to CLIP ' + dataset + ' ...');
+        clipWebSocketLHE = new WebSocket(CLIPSERVERURLLHE);
+
+        clipWebSocketLHE.on('open', () => {
+            console.log('connected to CLIP ' + dataset + ' server');
+        })
+        
+        clipWebSocketLHE.on('close', (event) => {
+            // Handle connection closed
+            clipWebSocketLHE.close();
+            clipWebSocketLHE = null;
+            console.log('Connection to CLIP ' + dataset + ' closed', event.code, event.reason);
+        });
+        
+        pendingCLIPResults = Array();
+
+        clipWebSocketLHE.on('message', (message) => {
+            handleCLIPResponse(message);
+        })
+
+        clipWebSocketLHE.on('error', (event) => {
+            console.log('Connection to CLIP ' + dataset + ' refused');
+        });
+
+    } catch(error) {
+        console.log("Cannot connect to CLIP ' + dataset + ' server");   
+    }
+}
+
+function handleCLIPResponse(message) {
+    //console.log('received from CLIP server: ' + message);
+    msg = JSON.parse(message);
+    numbefore = msg.results.length;
+    clientId = msg.clientId;
+    clientWS = clients.get(clientId);
+
+    console.log('received %s results from CLIP server', msg.num);
+
+    if (combineCLIPWithMongo === true) {
+
+        console.log('combined query');
+        let combinedResults = [];
+
+        const database = mongoclient.db('vbs2023'); // Replace with your database name
+        const collection = database.collection('videos'); // Replace with your collection name
+        var { query, projection } = getMongoQuery(year, month, day, weekday, text, concept, object, place, filename); 
+        console.log('(1) mongodb query: %s', JSON.stringify(query));
+        const sortCriteria = { filepath: 1 }; //-1 for desc
+        collection.find(query, projection).sort(sortCriteria).toArray((error, documents) => {
+            if (error) {
+                return;
+            }
+
+            console.log('got %d results from mongodb', documents.length);
+            let processingInfo = {"type": "info",  "num": 1, "totalresults": 1, "message": documents.length + " results in database, now filtering..."};
+            clientWS.send(JSON.stringify(processingInfo));
+
+            const dateSet = new Set();
+
+            for (let i = 0; i < msg.results.length; i++) {
+                const elem = msg.results[i];
+
+                for (let k = 0; k < documents.length; k++) {
+                    if (elem === documents[k].filepath) {
+                        if (queryMode === 'first') {
+                            let eyear = elem.substring(0,4);
+                            let emonth = elem.substring(4,6);
+                            let eday = elem.substring(7,9);
+                            let dateStr = eyear + emonth + eday;
+                            if (dateSet.has(dateStr) === false) {
+                                dateSet.add(dateStr);
+                                combinedResults.push(elem);
+                            }
+                        } else {
+                            combinedResults.push(elem);
+                        }
+                        break;
+                    } else if (elem < documents[k].filepath) {
+                        break;
+                    }
+                }
+            }
+
+            msg.results = combinedResults;
+            msg.totalresults = combinedResults.length;
+            msg.num = combinedResults.length;
+
+            console.log('forwarding %d combined results to client %s', msg.totalresults, clientId);
+            //console.log(JSON.stringify(msg));
+            clientWS.send(JSON.stringify(msg));
+
+            // Append jsonString to the file
+            msg.clientId = clientId;
+            fs.appendFile(LOGFILE, JSON.stringify(msg), function (err) {
+                if (err) {
+                    console.log('Error writing file', err)
+                }
+            });
+
+        });
+
+    } 
+    else if (combineCLIPwithCLIP > 0) {
+        pendingCLIPResults.push(msg);
+        combineCLIPwithCLIP--;
+        if (combineCLIPwithCLIP == 0) {
+            let jointResults = Array();
+            let jointResultsIdx = Array();
+            let jointScores = Array();
+            for (let r = 1; r < pendingCLIPResults.length; r++) {
+                let tresPrev = pendingCLIPResults[r-1].results;
+                let tres = pendingCLIPResults[r].results;
+                let tresIdx = pendingCLIPResults[r].resultsidx;
+                let tresScores = pendingCLIPResults[r].scores;
+                for (let i = 0; i < tres.length; i++) {
+                    let vid = tres[i].substring(0,11);
+                    let frame = parseInt(tres[i].substring(12,tres[i].indexOf('.')));
+                    for (let j = 0; j < tresPrev.length; j++) {
+                        let vidP = tresPrev[j].substring(0,11);
+                        let frameP = parseInt(tresPrev[j].substring(12,tres[i].indexOf('.')));
+
+                        if (vid == vidP && frame > frameP) {
+                            jointResults.push(tres[i]);
+                            jointResultsIdx.push(tresIdx[i]);
+                            jointScores.push(tresScores[i]);
+                            //console.log('found: ' + tres[i] + ': ' + vid + ' ' + frame + " > " + vidP + " " + frameP);
+                            break;
+                        }
+                    }
+                }
+            }
+            msg.results = jointResults;
+            msg.resultsidx = jointResultsIdx;
+            msg.totalresults = jointResults.length;
+            msg.num = jointResults.length;
+            console.log('forwarding %d joint results to client %s', msg.totalresults, clientId);
+            pendingCLIPResults = Array();
+            clientWS.send(JSON.stringify(msg));
+        }
+        
+    }
+    else {
+
+        if (filterCLIPResultsByDate === true || queryMode !== 'all') {
+
+            console.log('filter query');
+            let ly = year.toString().trim().length;
+            let lm = month.toString().trim().length;
+            let ld = day.toString().trim().length;
+            let lw = weekday.toString().trim().length;
+
+            const dateSet = new Set();
+        
+            if (ly > 0 || lm > 0 || ld > 0 || lw > 0 || queryMode !== 'all') {
+                for (let i = 0; i < msg.results.length; i++) {
+                    const elem = msg.results[i];
+                    let eyear = elem.substring(0,4);
+                    let emonth = elem.substring(4,6);
+                    let eday = elem.substring(7,9);
+        
+                    if (ly > 0 && eyear !== year) {
+                        msg.results.splice(i--, 1);
+                    }
+                    else if (lm > 0 && emonth !== month) {
+                        msg.results.splice(i--, 1);
+                    }
+                    else if (ld > 0 && eday !== day) {
+                        msg.results.splice(i--, 1);
+                    }
+                    else if (queryMode === 'first') {
+                        let dateStr = eyear + emonth + eday;
+                        if (dateSet.has(dateStr)) {
+                            msg.results.splice(i--,1);
+                        } else {
+                            dateSet.add(dateStr);
+                        }
+                    }
+                    else if (lw > 0) {
+                        let dstr = eyear + '-' + emonth + '-' + eday;
+                        let edate = new Date(dstr);
+                        let wd = edate.getDay();
+                        
+                        if (weekdays[wd] === weekday) {
+                            msg.results.splice(i--, 1);
+                        }
+                    }
+                }
+            }
+        }
+
+        numafter = msg.results.length;
+        if (numafter !== numbefore) {
+            msg.totalresults = msg.results.length;
+            msg.num = msg.results.length;
+        }
+        console.log('forwarding %d results (current before=%d after=%d) to client %s', msg.totalresults, numbefore, numafter, clientId);
+        //console.log(JSON.stringify(msg));
+        clientWS.send(JSON.stringify(msg));
+
+        // Append jsonString to the file
+        msg.clientId = clientId;
+        fs.appendFile(LOGFILE, JSON.stringify(msg), function (err) {
+            if (err) {
+                console.log('Error writing file', err)
+            }
+        });
+    }
+}
+
+connectToCLIPServerV3C();
+connectToCLIPServerMKV();
+connectToCLIPServerLHE();
 
 
 
