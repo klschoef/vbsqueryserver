@@ -11,14 +11,14 @@ const DISTINCTIVE_L2DIST1 = 10.0;
 const DISTINCTIVE_L2DIST2 = 15.0;
 const CLIPSERVERURLV3C = 'ws://' + config.config_CLIP_SERVER_V3C; 
 console.log(CLIPSERVERURLV3C);
-const CLIPSERVERURLMKV = 'ws://' + config.config_CLIP_SERVER_MKV; 
-console.log(CLIPSERVERURLMKV);
+const CLIPSERVERURLMVK = 'ws://' + config.config_CLIP_SERVER_MVK; 
+console.log(CLIPSERVERURLMVK);
 const CLIPSERVERURLLHE = 'ws://' + config.config_CLIP_SERVER_LHE; 
 console.log(CLIPSERVERURLLHE);
 
 const wss = new WebSocket.Server({ noServer: true }); //web socket to client
 let clipWebSocketV3C = null;
-let clipWebSocketMKV = null;
+let clipWebSocketMVK = null;
 let clipWebSocketLHE = null;
 
 const mongouri = 'mongodb://' + config.config_MONGODB_SERVER; // Replace with your MongoDB connection string
@@ -86,9 +86,9 @@ wss.on('connection', (ws) => {
         console.log('clipWebSocketV3C is null, try to re-connect');
         connectToCLIPServerV3C();
     }
-    if (clipWebSocketMKV === null) {
-        console.log('clipWebSocketMKV is null, try to re-connect');
-        connectToCLIPServerMKV();
+    if (clipWebSocketMVK === null) {
+        console.log('clipWebSocketMVK is null, try to re-connect');
+        connectToCLIPServerMVK();
     }
     if (clipWebSocketLHE === null) {
         console.log('clipWebSocketLHE is null, try to re-connect');
@@ -104,8 +104,8 @@ wss.on('connection', (ws) => {
         let clipWebSocket = null;
         if (msg.content.dataset == 'v3c') {
             clipWebSocket = clipWebSocketV3C;
-        } else if (msg.content.dataset == 'mkv') {
-            clipWebSocket = clipWebSocketMKV;
+        } else if (msg.content.dataset == 'mvk') {
+            clipWebSocket = clipWebSocketMVK;
         } else if (msg.content.dataset == 'lhe') {
             clipWebSocket = clipWebSocketLHE;
         }
@@ -384,30 +384,30 @@ function connectToCLIPServerV3C() {
     }
 }
 
-function connectToCLIPServerMKV() {
-    let dataset = 'MKV';
+function connectToCLIPServerMVK() {
+    let dataset = 'MVK';
     try {
         console.log('trying to connect to CLIP ' + dataset + ' ...');
-        clipWebSocketMKV = new WebSocket(CLIPSERVERURLMKV);
+        clipWebSocketMVK = new WebSocket(CLIPSERVERURLMVK);
 
-        clipWebSocketMKV.on('open', () => {
+        clipWebSocketMVK.on('open', () => {
             console.log('connected to CLIP ' + dataset + ' server');
         })
         
-        clipWebSocketMKV.on('close', (event) => {
+        clipWebSocketMVK.on('close', (event) => {
             // Handle connection closed
-            clipWebSocketMKV.close();
-            clipWebSocketMKV = null;
+            clipWebSocketMVK.close();
+            clipWebSocketMVK = null;
             console.log('Connection to CLIP ' + dataset + ' closed', event.code, event.reason);
         });
         
         pendingCLIPResults = Array();
 
-        clipWebSocketMKV.on('message', (message) => {
+        clipWebSocketMVK.on('message', (message) => {
             handleCLIPResponse(message);
         })
 
-        clipWebSocketMKV.on('error', (event) => {
+        clipWebSocketMVK.on('error', (event) => {
             console.log('Connection to CLIP ' + dataset + ' refused');
         });
 
@@ -629,7 +629,7 @@ function handleCLIPResponse(message) {
 }
 
 connectToCLIPServerV3C();
-connectToCLIPServerMKV();
+connectToCLIPServerMVK();
 connectToCLIPServerLHE();
 
 
