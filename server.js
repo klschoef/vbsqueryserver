@@ -21,6 +21,8 @@ let clipWebSocketV3C = null;
 let clipWebSocketMVK = null;
 let clipWebSocketLHE = null;
 
+let videoFiltering = 'all';
+
 const mongouri = 'mongodb://' + config.config_MONGODB_SERVER; // Replace with your MongoDB connection string
 const MongoClient = require('mongodb').MongoClient;
 let mongoclient = null;
@@ -147,13 +149,14 @@ wss.on('connection', (ws) => {
 
                     nodequery = msg.content.query;
 
-                    queryMode = msg.content.queryMode;
+                    //queryMode = msg.content.queryMode;
 
                     lenBefore = msg.content.query.trim().length;
                     clipQuery = parseParameters(msg.content.query)
                     combineCLIPWithMongo = false;
                     filterCLIPResultsByDate = false;
                     combineCLIPwithCLIP = 0;
+                    videoFiltering = msg.content.videoFiltering;
 
                     //special hack for file-similarity
                     /*if (similarto !== '') {
@@ -201,12 +204,12 @@ wss.on('connection', (ws) => {
                                 clipWebSocket.send(JSON.stringify(tmsg));
                             }
                             clipQueries = Array();
-                        } else if (isOnlyDateFilter() && queryMode !== 'distinctive' && queryMode !== 'moredistinctive') {
+                        } /*else if (isOnlyDateFilter() && queryMode !== 'distinctive' && queryMode !== 'moredistinctive') {
                             //C L I P   Q U E R Y   +   F I L T E R
                             filterCLIPResultsByDate = true;
                             //msg.content.resultsperpage = msg.content.maxresults;
                             clipWebSocket.send(JSON.stringify(msg));
-                        } else {
+                        }*/ else {
                             //C L I P   +   D B   Q U E R Y
                             combineCLIPWithMongo = true;
                             //msg.content.resultsperpage = msg.content.maxresults;
@@ -483,7 +486,7 @@ function handleCLIPResponse(message) {
 
                 for (let k = 0; k < documents.length; k++) {
                     if (elem === documents[k].filepath) {
-                        if (queryMode === 'first') {
+                        /*if (queryMode === 'first') {
                             let eyear = elem.substring(0,4);
                             let emonth = elem.substring(4,6);
                             let eday = elem.substring(7,9);
@@ -492,9 +495,9 @@ function handleCLIPResponse(message) {
                                 dateSet.add(dateStr);
                                 combinedResults.push(elem);
                             }
-                        } else {
+                        } else {*/
                             combinedResults.push(elem);
-                        }
+                        //}
                         break;
                     } else if (elem < documents[k].filepath) {
                         break;
@@ -562,6 +565,7 @@ function handleCLIPResponse(message) {
     }
     else {
 
+        /*
         if (filterCLIPResultsByDate === true || queryMode !== 'all') {
 
             console.log('filter query');
@@ -608,12 +612,25 @@ function handleCLIPResponse(message) {
                 }
             }
         }
+        */
+        let filteredResults = Array();
+        let videoIds = Array();
+        for (let i = 0; i < msg.results.length; i++) {
+            const elem = msg.results[i];
+            if (msg.videoFiltering === 'first' && videoIds.includes(elem.videoid)) {
+                continue;
+            }
+            videoIds.push(elem.videoid);
+            filteredResults.push(elem);
+        } 
 
-        numafter = msg.results.length;
+        msg.totalresults = filteredResults.length;
+        msg.results = filteredResults;
+        /*numafter = msg.results.length;
         if (numafter !== numbefore) {
             msg.totalresults = msg.results.length;
             msg.num = msg.results.length;
-        }
+        }*/
         console.log('forwarding %d results (current before=%d after=%d) to client %s', msg.totalresults, numbefore, numafter, clientId);
         //console.log(JSON.stringify(msg));
         clientWS.send(JSON.stringify(msg));
