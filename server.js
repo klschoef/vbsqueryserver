@@ -21,7 +21,7 @@ let clipWebSocketV3C = null;
 let clipWebSocketMVK = null;
 let clipWebSocketLHE = null;
 
-let videoFiltering = 'all';
+let videofiltering = 'all';
 
 const mongouri = 'mongodb://' + config.config_MONGODB_SERVER; // Replace with your MongoDB connection string
 const MongoClient = require('mongodb').MongoClient;
@@ -156,9 +156,9 @@ wss.on('connection', (ws) => {
                     combineCLIPWithMongo = false;
                     filterCLIPResultsByDate = false;
                     combineCLIPwithCLIP = 0;
-                    videoFiltering = msg.content.videoFiltering;
+                    videofiltering = msg.content.videofiltering;
 
-                    console.log('received videofiltering: ' + videoFiltering);
+                    console.log('received videofiltering: ' + videofiltering);
 
                     //special hack for file-similarity
                     /*if (similarto !== '') {
@@ -619,7 +619,7 @@ function handleCLIPResponse(message) {
         let videoIds = Array();
         for (let i = 0; i < msg.results.length; i++) {
             const elem = msg.results[i];
-            if (msg.videoFiltering === 'first' && videoIds.includes(elem.videoid)) {
+            if (videofiltering === 'first' && videoIds.includes(elem.videoid)) {
                 continue;
             }
             videoIds.push(elem.videoid);
