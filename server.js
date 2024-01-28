@@ -21,8 +21,6 @@ let clipWebSocketV3C = null;
 let clipWebSocketMVK = null;
 let clipWebSocketLHE = null;
 
-let videofiltering = 'all';
-
 const mongouri = 'mongodb://' + config.config_MONGODB_SERVER; // Replace with your MongoDB connection string
 const MongoClient = require('mongodb').MongoClient;
 let mongoclient = null;
@@ -473,7 +471,7 @@ function handleCLIPResponse(message) {
                         if (vid == vidP && frame > frameP) {
 
                             let videoid = getVideoId(tres[i]);
-                            if (clientSettings.videofiltering === 'first' && videoIds.includes(videoid)) {
+                            if (clientSettings.videoFiltering === 'first' && videoIds.includes(videoid)) {
                                 continue;
                             }
                             videoIds.push(videoid);
@@ -502,7 +500,7 @@ function handleCLIPResponse(message) {
         let videoIds = Array();
         for (let i = 0; i < msg.results.length; i++) {
             let videoid = getVideoId(msg.results[i]);
-            if (clientSettings.videofiltering === 'first' && videoIds.includes(videoid)) {
+            if (clientSettings.videoFiltering === 'first' && videoIds.includes(videoid)) {
                 continue;
             }
             videoIds.push(videoid);
@@ -810,7 +808,7 @@ async function queryVideoID(clientId, queryInput) {
             let videoIds = Array();
             await cursor.forEach(document => {
                 for(const shot of document.shots) {
-                    if (clientSettings.videofiltering === 'first' && videoIds.includes(document.videoid)) {
+                    if (clientSettings.videoFiltering === 'first' && videoIds.includes(document.videoid)) {
                         continue;
                     }
                     videoIds.push(document.videoid);
@@ -857,11 +855,9 @@ async function queryMetadata(clientId, queryInput) {
         let videoIds = Array();
         await cursor.forEach(document => {
             for(const shot of document.shots) {
-                if (clientSettings.videofiltering === 'first' && videoIds.includes(document.videoid)) {
-                    console.log('%=' + document.videoid);
+                if (clientSettings.videoFiltering === 'first' && videoIds.includes(document.videoid)) {
                     continue;
                 }
-                console.log('v-' + document.videoid);
                 videoIds.push(document.videoid);
                 results.push(document.videoid + '/' + shot.keyframe);
                 scores.push(1);
@@ -900,7 +896,7 @@ async function querySpeech(clientId, queryInput) {
         let videoIds = Array();
         await cursor.forEach(document => {
             for(const shot of document.shots) {
-                if (clientSettings.videofiltering === 'first' && videoIds.includes(document.videoid)) {
+                if (clientSettings.videoFiltering === 'first' && videoIds.includes(document.videoid)) {
                     continue;
                 }
                 videoIds.push(document.videoid);
