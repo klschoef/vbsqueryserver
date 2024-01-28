@@ -206,12 +206,12 @@ wss.on('connection', (ws) => {
                                 clipWebSocket.send(JSON.stringify(tmsg));
                             }
                             clipQueries = Array();
-                        } /*else if (isOnlyDateFilter() && queryMode !== 'distinctive' && queryMode !== 'moredistinctive') {
+                        } else if (isOnlyDateFilter() && queryMode !== 'distinctive' && queryMode !== 'moredistinctive') {
                             //C L I P   Q U E R Y   +   F I L T E R
                             filterCLIPResultsByDate = true;
                             //msg.content.resultsperpage = msg.content.maxresults;
                             clipWebSocket.send(JSON.stringify(msg));
-                        }*/ else {
+                        } else {
                             //C L I P   +   D B   Q U E R Y
                             combineCLIPWithMongo = true;
                             //msg.content.resultsperpage = msg.content.maxresults;
