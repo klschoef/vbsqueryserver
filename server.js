@@ -158,6 +158,8 @@ wss.on('connection', (ws) => {
                     combineCLIPwithCLIP = 0;
                     videoFiltering = msg.content.videoFiltering;
 
+                    console.log('received videofiltering: ' + videoFiltering);
+
                     //special hack for file-similarity
                     /*if (similarto !== '') {
                         msg.query = similarto;
