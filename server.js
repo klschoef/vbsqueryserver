@@ -494,8 +494,8 @@ function handleCLIPResponse(message) {
             msg.resultsidx = jointResultsIdx;
             msg.scores = jointScores;
             msg.totalresults = jointResults.length;
-            msg.num = totalresults - countFiltered; //jointResults.length;
-            msg.totalresults =  totalresults - countFiltered;
+            msg.num = jointResults.length;
+            msg.totalresults =  jointResults.length;
             console.log('forwarding %d joint results to client %s', msg.totalresults, clientId);
             pendingCLIPResults = Array();
             clientWS.send(JSON.stringify(msg));
