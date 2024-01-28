@@ -453,6 +453,7 @@ function handleCLIPResponse(message) {
             let jointResultsIdx = Array();
             let jointScores = Array();
             let videoIds = Array();
+            let countFiltered = 0;
 
             for (let r = 1; r < pendingCLIPResults.length; r++) {
                 let tresPrev = pendingCLIPResults[r-1].results;
@@ -472,6 +473,7 @@ function handleCLIPResponse(message) {
 
                             let videoid = getVideoId(tres[i]);
                             if (clientSettings.videoFiltering === 'first' && videoIds.includes(videoid)) {
+                                countFiltered++;
                                 continue;
                             }
                             videoIds.push(videoid);
@@ -490,6 +492,7 @@ function handleCLIPResponse(message) {
             msg.scores = jointScores;
             msg.totalresults = jointResults.length;
             msg.num = jointResults.length;
+            msg.totalresults = msg.totalresults - countFiltered;
             console.log('forwarding %d joint results to client %s', msg.totalresults, clientId);
             pendingCLIPResults = Array();
             clientWS.send(JSON.stringify(msg));
@@ -501,9 +504,11 @@ function handleCLIPResponse(message) {
         let filteredResultsIdx = Array();
         let filteredScores = Array();
         let videoIds = Array();
+        let countFiltered = 0;
         for (let i = 0; i < msg.results.length; i++) {
             let videoid = getVideoId(msg.results[i]);
             if (clientSettings.videoFiltering === 'first' && videoIds.includes(videoid)) {
+                countFiltered++;
                 continue;
             }
             videoIds.push(videoid);
@@ -516,6 +521,7 @@ function handleCLIPResponse(message) {
         msg.results = filteredResults;
         msg.resultsidx = filteredResultsIdx;
         msg.scores = filteredScores;
+        msg.totalresults = msg.totalresults - countFiltered;
         
         numafter = msg.results.length;
         if (numafter !== numbefore) {
