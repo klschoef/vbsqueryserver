@@ -825,9 +825,9 @@ async function queryVideoID(clientId, queryInput) {
 
         // Find the document with the matching text
         let cursor;
-        if (queryInput.query === '*' && queryInput.dataset === 'LHE') {
+        if (queryInput.query === '*' && queryInput.dataset === 'lhe') {
             cursor = await collection.find({ videoid: { $regex: 'LHE??'}}).sort({ videoid: 1 });
-        } else if (queryInput.query === '*' && queryInput.dataset === 'MVK') {
+        } else if (queryInput.query === '*' && queryInput.dataset === 'mvk') {
             cursor = await collection.find({ videoid: { $regex: '.*_.*_.*'}}).sort({ videoid: 1 });
         } else {
             cursor = await collection.find({ videoid: { $regex: queryInput.query, $options: "i" } }).sort({ videoid: 1 });;
