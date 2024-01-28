@@ -772,16 +772,14 @@ async function queryOCRText(clientId, queryInput) {
             response.results = document.frames;
             response.totalresults = response.num;   
 
-            console.log('§-' + clientSettings.videoFiltering + " -- " + document.frames.length + ": ");
             if (clientSettings.videoFiltering === 'first') {
                 let filteredFrames = [];
                 let videoIds = Array();
                 for (const frame of document.frames) {
                     let videoid = getVideoId(frame);
-                    if (videoIds.includes(document.videoid)) {
+                    if (videoIds.includes(videoid)) {
                         continue;
                     }
-                    console.log(videoid);
                     videoIds.push(videoid);
                     filteredFrames.push(frame);
                 }
