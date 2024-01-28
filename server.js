@@ -196,7 +196,7 @@ wss.on('connection', (ws) => {
                             clipWebSocket.send(JSON.stringify(msg));
                         }*/ else {
                             //C L I P   +   D B   Q U E R Y
-                            combineCLIPWithMongo = true;
+                            //combineCLIPWithMongo = true;
                             //msg.content.resultsperpage = msg.content.maxresults;
                             clipWebSocket.send(JSON.stringify(msg));
                         }
