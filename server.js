@@ -481,7 +481,7 @@ function handleCLIPResponse(message) {
                             jointResults.push(tres[i]);
                             jointResultsIdx.push(tresIdx[i]);
                             jointScores.push(tresScores[i]);
-                            //console.log('found: ' + tres[i] + ': ' + vid + ' ' + frame + " > " + vidP + " " + frameP);
+                            console.log('found: ' + tres[i] + ': ' + vid + ' ' + frame + " > " + vidP + " " + frameP);
                             break;
                         }
                     }
