@@ -487,6 +487,7 @@ function handleCLIPResponse(message) {
             }
             msg.results = jointResults;
             msg.resultsidx = jointResultsIdx;
+            msg.scores = jointScores;
             msg.totalresults = jointResults.length;
             msg.num = jointResults.length;
             console.log('forwarding %d joint results to client %s', msg.totalresults, clientId);
@@ -497,6 +498,8 @@ function handleCLIPResponse(message) {
     }
     else {
         let filteredResults = Array();
+        let filteredResultsIdx = Array();
+        let filteredScores = Array();
         let videoIds = Array();
         for (let i = 0; i < msg.results.length; i++) {
             let videoid = getVideoId(msg.results[i]);
@@ -505,10 +508,14 @@ function handleCLIPResponse(message) {
             }
             videoIds.push(videoid);
             filteredResults.push(msg.results[i]);
+            filteredResultsIdx.push(msg.resultsidx[i]);
+            filteredScores.push(msg.scores[i]);
         }
 
         //msg.totalresults = filteredResults.length;
         msg.results = filteredResults;
+        msg.resultsidx = filteredResultsIdx;
+        msg.scores = filteredScores;
         
         numafter = msg.results.length;
         if (numafter !== numbefore) {
