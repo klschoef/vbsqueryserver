@@ -454,12 +454,15 @@ function handleCLIPResponse(message) {
             let jointScores = Array();
             let videoIds = Array();
             let countFiltered = 0;
+            let totalresults = pendingCLIPResults[0].length;
 
             for (let r = 1; r < pendingCLIPResults.length; r++) {
                 let tresPrev = pendingCLIPResults[r-1].results;
                 let tres = pendingCLIPResults[r].results;
                 let tresIdx = pendingCLIPResults[r].resultsidx;
                 let tresScores = pendingCLIPResults[r].scores;
+
+                totalresults = totalresults + tres.length;
 
                 for (let i = 0; i < tres.length; i++) {
                     let vid = tres[i].substring(0,11);
@@ -492,7 +495,7 @@ function handleCLIPResponse(message) {
             msg.scores = jointScores;
             msg.totalresults = jointResults.length;
             msg.num = jointResults.length;
-            msg.totalresults = msg.totalresults - countFiltered;
+            msg.totalresults =  totalresults - countFiltered;
             console.log('forwarding %d joint results to client %s', msg.totalresults, clientId);
             pendingCLIPResults = Array();
             clientWS.send(JSON.stringify(msg));
@@ -523,12 +526,13 @@ function handleCLIPResponse(message) {
         msg.scores = filteredScores;
         msg.totalresults = msg.totalresults - countFiltered;
         
-        numafter = msg.results.length;
+        /*numafter = msg.results.length;
         if (numafter !== numbefore) {
             msg.totalresults = msg.totalresults - (numafter - numbefore); //msg.results.length;
             msg.num = msg.results.length;
-        }
-        console.log('forwarding %d results (current before=%d after=%d) to client %s', msg.totalresults, numbefore, numafter, clientId);
+        }*/
+        //console.log('forwarding %d results (current before=%d after=%d) to client %s', msg.totalresults, numbefore, numafter, clientId);
+        console.log('forwarding %d results (current before=%d) to client %s', msg.totalresults, numbefore, clientId);
         //console.log(JSON.stringify(msg));
         clientWS.send(JSON.stringify(msg));
 
