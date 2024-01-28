@@ -454,7 +454,6 @@ function handleCLIPResponse(message) {
             let jointScores = Array();
             let videoIds = Array();
             let countFiltered = 0;
-            let totalresults = pendingCLIPResults[0].length;
 
             for (let r = 1; r < pendingCLIPResults.length; r++) {
                 let tresPrev = pendingCLIPResults[r-1].results;
@@ -462,17 +461,15 @@ function handleCLIPResponse(message) {
                 let tresIdx = pendingCLIPResults[r].resultsidx;
                 let tresScores = pendingCLIPResults[r].scores;
 
-                totalresults = totalresults + tres.length;
-
                 for (let i = 0; i < tres.length; i++) {
-                    let vid = tres[i].substring(0,11);
-                    let frame = parseInt(tres[i].substring(12,tres[i].indexOf('.')));
+                    let vid = getVideoId(tres[i]); //tres[i].substring(0,11);
+                    let frame = extractFrameNumber(tres[i]); //parseInt(tres[i].substring(12,tres[i].indexOf('.')));
                     
                     for (let j = 0; j < tresPrev.length; j++) {
-                        let vidP = tresPrev[j].substring(0,11);
-                        let frameP = parseInt(tresPrev[j].substring(12,tres[i].indexOf('.')));
+                        let vidP = getVideoId(tresPrev[j]); //tresPrev[j].substring(0,11);
+                        let frameP = extractFrameNumber(tresPrev[j]); //parseInt(tresPrev[j].substring(12,tres[i].indexOf('.')));
 
-                        if (vid == vidP && frame > frameP) {
+                        if (vid === vidP && frame > frameP) {
 
                             let videoid = getVideoId(tres[i]);
                             if (clientSettings.videoFiltering === 'first' && videoIds.includes(videoid)) {
@@ -557,6 +554,17 @@ function getVideoId(result) {
     let filename = elem.split('/');
     let videoid = filename[0];
     return videoid;
+}
+
+function extractFrameNumber(filename) {
+    // Regular expression to match digits between the last underscore and the dot
+    const regex = /_(\d+)\./;
+
+    // Use match() to find the digits
+    const match = filename.match(regex);
+
+    // If a match is found, return it as a number, otherwise return null
+    return match ? Number(match[1]) : null;
 }
 
 
