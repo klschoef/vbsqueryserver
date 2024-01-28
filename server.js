@@ -30,7 +30,15 @@ connectMongoDB();
 
 // Variables to store the parameter values
 let text, concept, object, place, year, month, day, weekday, filename, similarto;
-let combineCLIPWithMongo = false, /*filterCLIPResultsByDate = false,*/ /*queryMode = 'all',*/ combineCLIPwithCLIP = 0;
+
+class QuerySettings {
+    constructor(combineCLIPwithMongo = false, combineCLIPwithCLIP = 0) {
+        this.combineCLIPwithMongo = combineCLIPwithMongo;
+        this.combineCLIPwithCLIP = combineCLIPwithCLIP;
+    }
+}
+
+let settingsMap = new Map();
 
 //////////////////////////////////////////////////////////////////
 // Connection to client
@@ -65,8 +73,9 @@ wss.on('connection', (ws) => {
     
     let clientId = generateUniqueClientId(); // You would need to implement this function
     clients.set(clientId, ws);
-
     console.log('client connected: %s', clientId);
+    let clientSettings = new QuerySettings();
+    settingsMap.set(clientId, clientSettings);
 
     //check CLIPserver connection
     if (clipWebSocketV3C === null) {
@@ -135,8 +144,7 @@ wss.on('connection', (ws) => {
                 if (msg.content.type === 'textquery') {
                     lenBefore = msg.content.query.trim().length;
                     clipQuery = parseParameters(msg.content.query)
-                    combineCLIPWithMongo = false;
-                    combineCLIPwithCLIP = 0;
+
                     videofiltering = msg.content.videofiltering;
                     
                     if (clipQuery.trim().length > 0) {
@@ -169,7 +177,7 @@ wss.on('connection', (ws) => {
                         }
 
                         if (clipQueries.length > 0) {
-                            combineCLIPwithCLIP = clipQueries.length;
+                            clientSettings.combineCLIPwithCLIP = clipQueries.length;
                             for (let i=0; i < clipQueries.length; i++) {
                                 let tmsg = msg;
                                 tmsg.content.query = clipQueries[i];
@@ -179,16 +187,16 @@ wss.on('connection', (ws) => {
                             clipQueries = Array();
                         } else {
                             //C L I P   +   D B   Q U E R Y  <---- NO, not working now
-                            //combineCLIPWithMongo = true;
+                            //clientSettings.combineCLIPwithMongo = true
                             //msg.content.resultsperpage = msg.content.maxresults;
                             clipWebSocket.send(JSON.stringify(msg));
                         }   
                     }
                 } else if (msg.content.type === 'similarityquery') {
-                    combineCLIPWithMongo = false;
+                    clientSettings.combineCLIPwithMongo = false;
                     clipWebSocket.send(JSON.stringify(msg));
                 } else if (msg.content.type === 'file-similarityquery') {
-                    combineCLIPWithMongo = false;
+                    clientSettings.combineCLIPwithMongo = false;
                     clipWebSocket.send(JSON.stringify(msg));
                 }
             }
@@ -375,10 +383,11 @@ function handleCLIPResponse(message) {
     numbefore = msg.results.length;
     clientId = msg.clientId;
     clientWS = clients.get(clientId);
+    let clientSettings = settingsMap.get(clientId);
 
     console.log('received %s results from CLIP server', msg.num);
 
-    if (combineCLIPWithMongo === true) {
+    if (clientSettings.combineCLIPwithMongo === true) {
 
         console.log('combined query');
         let combinedResults = [];
@@ -431,10 +440,10 @@ function handleCLIPResponse(message) {
         });
 
     } 
-    else if (combineCLIPwithCLIP > 0) {
+    else if (clientSettings.combineCLIPwithCLIP > 0) {
         pendingCLIPResults.push(msg);
-        combineCLIPwithCLIP--;
-        if (combineCLIPwithCLIP == 0) {
+        clientSettings.combineCLIPwithCLIP--;
+        if (clientSettings.combineCLIPwithCLIP == 0) {
             let jointResults = Array();
             let jointResultsIdx = Array();
             let jointScores = Array();
