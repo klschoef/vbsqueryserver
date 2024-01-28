@@ -826,7 +826,7 @@ async function queryVideoID(clientId, queryInput) {
         // Find the document with the matching text
         let cursor;
         if (queryInput.query === '*' && queryInput.dataset == 'LHE') {
-            cursor = await collection.find({ videoid: { $regex: 'LHE*'}}).sort({ videoid: 1 });
+            cursor = await collection.find({ videoid: { $regex: 'LHE??'}}).sort({ videoid: 1 });
         } else {
             cursor = await collection.find({ videoid: { $regex: queryInput.query, $options: "i" } }).sort({ videoid: 1 });;
         }
