@@ -631,7 +631,7 @@ function handleCLIPResponse(message) {
         
         numafter = msg.results.length;
         if (numafter !== numbefore) {
-            msg.totalresults = msg.results.length;
+            msg.totalresults = msg.totalresults - (numafter - numbefore); //msg.results.length;
             msg.num = msg.results.length;
         }
         console.log('forwarding %d results (current before=%d after=%d) to client %s', msg.totalresults, numbefore, numafter, clientId);
