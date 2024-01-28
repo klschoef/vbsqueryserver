@@ -650,6 +650,7 @@ function getMongoQuery(yearValue, monthValue, dayValue, weekdayValue, textValue,
   
 async function queryClusters(clientId) {
     try {
+        let clientSettings = settingsMap.get(clientId);
         const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('clusters'); // Replace with your collection name
     
@@ -671,6 +672,7 @@ async function queryClusters(clientId) {
 
 async function getVideoFPS(clientId, queryInput, correlationId) {
     try {
+        let clientSettings = settingsMap.get(clientId);
         //console.log('received '+ JSON.stringify(queryInput));
         const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
@@ -703,6 +705,7 @@ async function getVideoFPS(clientId, queryInput, correlationId) {
 
 async function getVideoInfo(clientId, queryInput) {
     try {
+        let clientSettings = settingsMap.get(clientId);
         const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
 
@@ -731,6 +734,7 @@ async function getVideoInfo(clientId, queryInput) {
 
 async function getVideoSummaries(clientId, queryInput) {
     try {
+        let clientSettings = settingsMap.get(clientId);
         const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
 
@@ -756,6 +760,7 @@ async function getVideoSummaries(clientId, queryInput) {
 
 async function queryOCRText(clientId, queryInput) {
     try {
+        let clientSettings = settingsMap.get(clientId);
         const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('texts'); // Replace with your collection name
 
@@ -782,6 +787,7 @@ async function queryOCRText(clientId, queryInput) {
 
 async function queryVideoID(clientId, queryInput) {
     try {
+        let clientSettings = settingsMap.get(clientId);
         const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
 
@@ -831,6 +837,7 @@ async function queryVideoID(clientId, queryInput) {
 
 async function queryMetadata(clientId, queryInput) {
     try {
+        let clientSettings = settingsMap.get(clientId);
         const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
 
@@ -873,6 +880,7 @@ async function queryMetadata(clientId, queryInput) {
 
 async function querySpeech(clientId, queryInput) {
     try {
+        let clientSettings = settingsMap.get(clientId);
         const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
 
@@ -913,6 +921,7 @@ async function querySpeech(clientId, queryInput) {
 
 async function queryClusters(clientId) {
     try {
+        let clientSettings = settingsMap.get(clientId);
         const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('clusters'); // Replace with your collection name
 
@@ -936,6 +945,7 @@ async function queryClusters(clientId) {
 
 async function queryCluster(clientId, queryInput) {
     try {
+        let clientSettings = settingsMap.get(clientId);
         const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('clusters'); // Replace with your collection name
 
