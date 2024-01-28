@@ -30,7 +30,7 @@ connectMongoDB();
 
 // Variables to store the parameter values
 let text, concept, object, place, year, month, day, weekday, filename, similarto;
-let combineCLIPWithMongo = false, filterCLIPResultsByDate = false, queryMode = 'all', combineCLIPwithCLIP = 0;
+let combineCLIPWithMongo = false, /*filterCLIPResultsByDate = false,*/ queryMode = 'all', combineCLIPwithCLIP = 0;
 
 //////////////////////////////////////////////////////////////////
 // Connection to client
@@ -53,21 +53,6 @@ server.on('upgrade', (request, socket, head) => {
         wss.emit('connection', ws, request);
     });
 });
-
-function isOnlyDateFilter() {
-    if (weekday.toString().trim().length > 0 ||
-        text.toString().trim().length > 0 ||
-        filename.toString().trim().length > 0 ||
-        concept.toString().trim().length > 0 ||
-        object.toString().trim().length > 0 ||
-        place.toString().trim().length > 0 ||
-        similarto.toString().trim().length > 0) {
-            return false;
-        }
-    else {
-        return true;
-    }
-}
 
 function generateUniqueClientId() {
     return uuidv4();
@@ -154,11 +139,9 @@ wss.on('connection', (ws) => {
                     lenBefore = msg.content.query.trim().length;
                     clipQuery = parseParameters(msg.content.query)
                     combineCLIPWithMongo = false;
-                    filterCLIPResultsByDate = false;
+                    //filterCLIPResultsByDate = false;
                     combineCLIPwithCLIP = 0;
                     videofiltering = msg.content.videofiltering;
-
-                    console.log('received videofiltering: ' + videofiltering);
 
                     //special hack for file-similarity
                     /*if (similarto !== '') {
@@ -206,12 +189,12 @@ wss.on('connection', (ws) => {
                                 clipWebSocket.send(JSON.stringify(tmsg));
                             }
                             clipQueries = Array();
-                        } else if (isOnlyDateFilter() && queryMode !== 'distinctive' && queryMode !== 'moredistinctive') {
+                        } /*else if (isOnlyDateFilter() && queryMode !== 'distinctive' && queryMode !== 'moredistinctive') {
                             //C L I P   Q U E R Y   +   F I L T E R
                             filterCLIPResultsByDate = true;
                             //msg.content.resultsperpage = msg.content.maxresults;
                             clipWebSocket.send(JSON.stringify(msg));
-                        } else {
+                        }*/ else {
                             //C L I P   +   D B   Q U E R Y
                             combineCLIPWithMongo = true;
                             //msg.content.resultsperpage = msg.content.maxresults;
@@ -240,11 +223,11 @@ wss.on('connection', (ws) => {
                     }
                 } else if (msg.content.type === 'similarityquery') {
                     combineCLIPWithMongo = false;
-                    filterCLIPResultsByDate = false;
+                    //filterCLIPResultsByDate = false;
                     clipWebSocket.send(JSON.stringify(msg));
                 } else if (msg.content.type === 'file-similarityquery') {
                     combineCLIPWithMongo = false;
-                    filterCLIPResultsByDate = false;
+                    //filterCLIPResultsByDate = false;
                     clipWebSocket.send(JSON.stringify(msg));
                 } else if (msg.content.type === 'metadataquery') {
                     queryImage(msg.content.imagepath).then((queryResults) => {
