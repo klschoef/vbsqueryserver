@@ -858,8 +858,10 @@ async function queryMetadata(clientId, queryInput) {
         await cursor.forEach(document => {
             for(const shot of document.shots) {
                 if (clientSettings.videofiltering === 'first' && videoIds.includes(document.videoid)) {
+                    console.log('%=' + document.videoid);
                     continue;
                 }
+                console.log('v-' + document.videoid);
                 videoIds.push(document.videoid);
                 results.push(document.videoid + '/' + shot.keyframe);
                 scores.push(1);
