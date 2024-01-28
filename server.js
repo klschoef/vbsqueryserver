@@ -824,7 +824,13 @@ async function queryVideoID(clientId, queryInput) {
         const collection = database.collection('videos'); // Replace with your collection name
 
         // Find the document with the matching text
-        const cursor = await collection.find({ videoid: { $regex: queryInput.query, $options: "i" } });
+        let cursor;
+        if (queryInput.query === '*') {
+            cursor = await collection.find({ }).sort({ videoid: 1 });
+        } else {
+            cursor = await collection.find({ videoid: { $regex: queryInput.query, $options: "i" } }).sort({ videoid: 1 });;
+        }
+        
         
         let response = { "type": "videoid", "num": 0, "results": [], "totalresults": 0, "scores": [], "dataset": "v3c" };
         
