@@ -704,10 +704,10 @@ async function getVideoFPS(clientId, queryInput, correlationId) {
             results.push(document);
         });
 
-        let response = { "type": "videofps", "synchronous": query.synchronous, "videoid": queryInput.videoid, "fps": results[0].fps, "duration": results[0].duration, "correlationId": correlationId };
+        let response = { "type": "videofps", "synchronous": queryInput.synchronous, "videoid": queryInput.videoid, "fps": results[0].fps, "duration": results[0].duration, "correlationId": correlationId };
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
-        console.log('sent back fps info: ' + JSON.stringify(response))
+        //console.log('sent back fps info: ' + JSON.stringify(response))
 
     }  catch (error) {
         console.log("error with mongodb: " + error);
