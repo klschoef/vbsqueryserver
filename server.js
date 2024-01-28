@@ -626,13 +626,14 @@ function handleCLIPResponse(message) {
             filteredResults.push(elem);
         } 
 
-        msg.totalresults = filteredResults.length;
+        //msg.totalresults = filteredResults.length;
         msg.results = filteredResults;
-        /*numafter = msg.results.length;
+        
+        numafter = msg.results.length;
         if (numafter !== numbefore) {
             msg.totalresults = msg.results.length;
             msg.num = msg.results.length;
-        }*/
+        }
         console.log('forwarding %d results (current before=%d after=%d) to client %s', msg.totalresults, numbefore, numafter, clientId);
         //console.log(JSON.stringify(msg));
         clientWS.send(JSON.stringify(msg));
