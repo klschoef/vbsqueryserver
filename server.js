@@ -494,7 +494,7 @@ function handleCLIPResponse(message) {
             msg.resultsidx = jointResultsIdx;
             msg.scores = jointScores;
             msg.totalresults = jointResults.length;
-            msg.num = jointResults.length;
+            msg.num = totalresults - countFiltered; //jointResults.length;
             msg.totalresults =  totalresults - countFiltered;
             console.log('forwarding %d joint results to client %s', msg.totalresults, clientId);
             pendingCLIPResults = Array();
@@ -525,6 +525,7 @@ function handleCLIPResponse(message) {
         msg.resultsidx = filteredResultsIdx;
         msg.scores = filteredScores;
         msg.totalresults = msg.totalresults - countFiltered;
+        msg.num = msg.num - countFiltered;
         
         /*numafter = msg.results.length;
         if (numafter !== numbefore) {
