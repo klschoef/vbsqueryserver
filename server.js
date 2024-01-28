@@ -618,11 +618,11 @@ function handleCLIPResponse(message) {
         let filteredResults = Array();
         let videoIds = Array();
         for (let i = 0; i < msg.results.length; i++) {
-            const elem = msg.results[i];
-            if (videofiltering === 'first' && videoIds.includes(elem.videoid)) {
+            let videoid = getVideoId(msg.results[i]);
+            if (videofiltering === 'first' && videoIds.includes(videoid)) {
                 continue;
             }
-            videoIds.push(elem.videoid);
+            videoIds.push(videoid);
             filteredResults.push(elem);
         } 
 
@@ -653,6 +653,12 @@ connectToCLIPServerMVK();
 connectToCLIPServerLHE();
 
 
+function getVideoId(result) {
+    const elem = result;
+    let filename = elem.split('/');
+    let videoid = filename[0];
+    return videoid;
+}
 
 
 //////////////////////////////////////////////////////////////////
