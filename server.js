@@ -30,7 +30,7 @@ connectMongoDB();
 
 // Variables to store the parameter values
 let text, concept, object, place, year, month, day, weekday, filename, similarto;
-let combineCLIPWithMongo = false, /*filterCLIPResultsByDate = false,*/ queryMode = 'all', combineCLIPwithCLIP = 0;
+let combineCLIPWithMongo = false, /*filterCLIPResultsByDate = false,*/ /*queryMode = 'all',*/ combineCLIPwithCLIP = 0;
 
 //////////////////////////////////////////////////////////////////
 // Connection to client
@@ -88,6 +88,13 @@ wss.on('connection', (ws) => {
 
         msg = JSON.parse(message);
 
+        //logging
+        fs.appendFile(LOGFILE, JSON.stringify(msg), function (err) {
+            if (err) {
+                console.log('Error writing file', err)
+            }
+        });
+
         let clipWebSocket = null;
         if (msg.content.dataset == 'v3c') {
             clipWebSocket = clipWebSocketV3C;
@@ -124,18 +131,8 @@ wss.on('connection', (ws) => {
             } else {
                 // Append jsonString to the file
                 msg.clientId = clientId; //give client a unique id on the node server (and set it for every msg)
-                fs.appendFile(LOGFILE, JSON.stringify(msg), function (err) {
-                    if (err) {
-                        console.log('Error writing file', err)
-                    }
-                });
-
-                if (msg.content.type === 'textquery') { // || msg.content.type == 'file-similarityquery'
-
-                    nodequery = msg.content.query;
-
-                    queryMode = msg.content.queryMode;
-
+                
+                if (msg.content.type === 'textquery') {
                     lenBefore = msg.content.query.trim().length;
                     clipQuery = parseParameters(msg.content.query)
                     combineCLIPWithMongo = false;
@@ -185,27 +182,7 @@ wss.on('connection', (ws) => {
                             //combineCLIPWithMongo = true;
                             //msg.content.resultsperpage = msg.content.maxresults;
                             clipWebSocket.send(JSON.stringify(msg));
-                        }
-
-                        
-                    } else {
-                        //D B   Q U E R Y
-                        console.log('querying Node server');
-                        queryImages(year, month, day, weekday, text, concept, object, place, filename, clientId).then((queryResults) => {
-                            console.log("query* finished");
-                            if ("results" in queryResults) {
-                                console.log('sending %d results to client', queryResults.results.length);
-                                ws.send(JSON.stringify(queryResults));
-
-                                // Append jsonString to the file
-                                queryResults.clientId = clientId;
-                                fs.appendFile(LOGFILE, JSON.stringify(queryResults), function (err) {
-                                    if (err) {
-                                        console.log('Error writing file', err)
-                                    }
-                                });
-                            }
-                        });
+                        }   
                     }
                 } else if (msg.content.type === 'similarityquery') {
                     combineCLIPWithMongo = false;
@@ -213,34 +190,6 @@ wss.on('connection', (ws) => {
                 } else if (msg.content.type === 'file-similarityquery') {
                     combineCLIPWithMongo = false;
                     clipWebSocket.send(JSON.stringify(msg));
-                } else if (msg.content.type === 'metadataquery') {
-                    queryImage(msg.content.imagepath).then((queryResults) => {
-                        console.log("query finished");
-                        if (queryResults != undefined && "results" in queryResults) {
-                            console.log('sending %d results to client', queryResults.results.length);
-                            ws.send(JSON.stringify(queryResults));
-
-                            // Append jsonString to the file
-                            queryResults.clientId = clientId;
-                            fs.appendFile(LOGFILE, JSON.stringify(queryResults), function (err) {
-                                if (err) {
-                                    console.log('Error writing file', err)
-                                }
-                            });
-                        }
-                    });
-                } 
-                /*else if (msg.content.type === 'objects') {
-                    queryObjects(clientId);
-                }
-                else if (msg.content.type === 'concepts') {
-                    queryConcepts(clientId);
-                }
-                else if (msg.content.type === 'places') {
-                    queryPlaces(clientId);
-                }*/
-                else if (msg.content.type === 'texts') {
-                    queryTexts(clientId);
                 }
             }
         }
@@ -455,18 +404,7 @@ function handleCLIPResponse(message) {
 
                 for (let k = 0; k < documents.length; k++) {
                     if (elem === documents[k].filepath) {
-                        /*if (queryMode === 'first') {
-                            let eyear = elem.substring(0,4);
-                            let emonth = elem.substring(4,6);
-                            let eday = elem.substring(7,9);
-                            let dateStr = eyear + emonth + eday;
-                            if (dateSet.has(dateStr) === false) {
-                                dateSet.add(dateStr);
-                                combinedResults.push(elem);
-                            }
-                        } else {*/
-                            combinedResults.push(elem);
-                        //}
+                        combinedResults.push(elem);
                         break;
                     } else if (elem < documents[k].filepath) {
                         break;
@@ -599,84 +537,6 @@ function connectMongoDB() {
     });
 }
 
-
-
-async function queryImages(yearValue, monthValue, dayValue, weekdayValue, textValue, conceptValue, objectValue, placeValue, filenameValue, clientId) {
-  try {
-    if (!mongoclient.isConnected()) {
-        console.log('mongodb not connected!');
-        connectMongoDB();
-    } else {
-        const database = mongoclient.db('lsc'); // Replace with your database name
-        const collection = database.collection('images'); // Replace with your collection name
-
-        clientWS = clients.get(clientId);
-
-        const sortCriteria = { minute_id: 1 }; //-1 for desc
-        var { query, projection } = getMongoQuery(yearValue, monthValue, dayValue, weekdayValue, textValue, conceptValue, objectValue, placeValue, filenameValue); //-1 for desc
-
-        if (JSON.stringify(query) === "{}") {
-            console.log('empty query not allowed');
-            let queryResults = { "num": 0, "totalresults": 0, "results": []  };
-            clientWS.send(JSON.stringify(queryResults));
-
-            // Append jsonString to the file
-            queryResults.clientId = clientId;
-            fs.appendFile(LOGFILE, JSON.stringify(queryResults), function (err) {
-                if (err) {
-                    console.log('Error writing file', err)
-                }
-            });
-
-            return queryResults;
-        }
-
-        console.log('mongodb query: %s', JSON.stringify(query));
-        const cursor = collection.find(query, projection); //use sort(sortCriteria); //will give an array
-        const count = await cursor.count();
-        console.log('%d results to client %s', count, clientId);
-
-        let processingInfo = {"type": "info",  "num": 1, "totalresults": 1, "message": count + " results in database, loading from server..."};
-        clientWS.send(JSON.stringify(processingInfo));
-
-        let queryResults = { "num": count, "totalresults": count };
-        let results = [];
-
-        const dateSet = new Set();
-
-        await cursor.forEach(document => {
-            // Access the filename field in each document
-            const filename = document.filepath;
-
-            if (queryMode === 'first') {
-                let eyear = filename.substring(0,4);
-                let emonth = filename.substring(4,6);
-                let eday = filename.substring(7,9);
-                let dateStr = eyear + emonth + eday;
-                if (dateSet.has(dateStr) === false) {
-                    results.push(filename);
-                    dateSet.add(dateStr);
-                } 
-            } else {
-                results.push(filename);
-            }
-            //console.log(filename);
-        });
-
-        queryResults.results = results;
-        return queryResults;
-    }
-  } /*catch (error) {
-    console.log("error with mongodb: " + error);
-    await mongoclient.close();
-  }*/ finally {
-    // Close the MongoDB connection when finished
-    //await mongoclient.close();
-  }
-}
-
-
-
 function getMongoQuery(yearValue, monthValue, dayValue, weekdayValue, textValue, conceptValue, objectValue, placeValue, filenameValue) {
     let query = {};
 
@@ -747,53 +607,17 @@ function getMongoQuery(yearValue, monthValue, dayValue, weekdayValue, textValue,
         query.filename = { $regex: filenameValue, $options: 'i' };
     }
 
-    if (queryMode === 'distinctive') {
-        query.l2dist = { $gt: DISTINCTIVE_L2DIST1 };
-    } else if (queryMode == 'moredistinctive') {
-        query.l2dist = { $gt: DISTINCTIVE_L2DIST2 };
-    }
+    //if (queryMode === 'distinctive') {
+    //    query.l2dist = { $gt: DISTINCTIVE_L2DIST1 };
+    //} else if (queryMode == 'moredistinctive') {
+    //    query.l2dist = { $gt: DISTINCTIVE_L2DIST2 };
+    //}
 
     console.log(JSON.stringify(query));
 
     const projection = { filepath: 1 };
 
     return { query, projection };
-}
-
-async function queryImage(url) {
-    try {
-        if (!mongoclient.isConnected()) {
-            console.log('mongodb not connected!');
-            connectMongoDB();
-        } else {
-            const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
-            const collection = database.collection('images'); // Replace with your collection name
-        
-            let query = { "filepath": url }; 
-        
-            console.log('mongodb query: %s', JSON.stringify(query));
-            const cursor = collection.find(query);
-        
-            let queryResults = { "type": "metadata", "num": 1, "totalresults": 1 };
-            let results = [];
-        
-            await cursor.forEach(document => {
-                // Access the filename field in each document
-                results.push(document);
-                //console.log(filename);
-            });
-        
-            queryResults.results = results;
-            return queryResults;
-        }
-  
-    } catch (error) {
-        console.log("error with mongodb: " + error);
-        await mongoclient.close();
-    } finally {
-      // Close the MongoDB connection when finished
-      //await mongoclient.close();
-    }
 }
 
   
