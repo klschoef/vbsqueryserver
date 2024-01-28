@@ -770,7 +770,23 @@ async function queryOCRText(clientId, queryInput) {
         if (document) {
             response.num = document.frames.length;
             response.results = document.frames;
-            response.totalresults = response.num;
+            response.totalresults = response.num;   
+
+            if (clientSettings.videoFiltering === 'first') {
+                let filteredFrames = [];
+                let videoIds = Array();
+                for (const frame of document.frames) {
+                    let videoid = getVideoId(frame);
+                    if (videoIds.includes(document.videoid)) {
+                        continue;
+                    }
+                    videoIds.push(videoid);
+                    filteredFrames.push(frame);
+                }
+                response.num = filteredFrames.length;
+                response.results = filteredFrames;
+            }
+
             response.scores  = new Array(document.frames.length).fill(1);
         }
 
