@@ -623,7 +623,7 @@ function handleCLIPResponse(message) {
                 continue;
             }
             videoIds.push(videoid);
-            filteredResults.push(elem);
+            filteredResults.push(msg.results[i]);
         } 
 
         //msg.totalresults = filteredResults.length;
