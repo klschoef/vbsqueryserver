@@ -829,22 +829,13 @@ async function queryVideoID(clientId, queryInput) {
             cursor = await collection.find({ videoid: { $regex: 'LHE??'}}).sort({ videoid: 1 });
         } else if (queryInput.query === '*' && queryInput.dataset === 'mvk') {
             cursor = await collection.find({ videoid: { $regex: '.*_.*_.*'}}).sort({ videoid: 1 });
-        } else {
+        } else if (queryInput.query !== '*') {
             cursor = await collection.find({ videoid: { $regex: queryInput.query, $options: "i" } }).sort({ videoid: 1 });;
         }
-        
-        
+
         let response = { "type": "videoid", "num": 0, "results": [], "totalresults": 0, "scores": [], "dataset": "v3c" };
-        
-        /*let results = [];
-        let scores = [];
-        if (document) {
-            for(const shot of document.shots) {
-                results.push(document.videoid + '/' + shot.keyframe);
-                scores.push(1);
-            }
-        }*/
-        if (cursor) {
+    
+        if (cursor !== undefined) {
             let results = [];
             let scores = [];
             let videoIds = Array();
