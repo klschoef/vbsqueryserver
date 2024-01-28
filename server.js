@@ -139,17 +139,8 @@ wss.on('connection', (ws) => {
                     lenBefore = msg.content.query.trim().length;
                     clipQuery = parseParameters(msg.content.query)
                     combineCLIPWithMongo = false;
-                    //filterCLIPResultsByDate = false;
                     combineCLIPwithCLIP = 0;
                     videofiltering = msg.content.videofiltering;
-
-                    //special hack for file-similarity
-                    /*if (similarto !== '') {
-                        msg.query = similarto;
-                        msg.pathprefix = '';
-                        msg.type = 'file-similarityquery';
-                        clipQuery = 'non-empty-string';
-                    }*/
                     
                     if (clipQuery.trim().length > 0) {
                         msg.content.query = clipQuery
@@ -189,13 +180,8 @@ wss.on('connection', (ws) => {
                                 clipWebSocket.send(JSON.stringify(tmsg));
                             }
                             clipQueries = Array();
-                        } /*else if (isOnlyDateFilter() && queryMode !== 'distinctive' && queryMode !== 'moredistinctive') {
-                            //C L I P   Q U E R Y   +   F I L T E R
-                            filterCLIPResultsByDate = true;
-                            //msg.content.resultsperpage = msg.content.maxresults;
-                            clipWebSocket.send(JSON.stringify(msg));
-                        }*/ else {
-                            //C L I P   +   D B   Q U E R Y
+                        } else {
+                            //C L I P   +   D B   Q U E R Y  <---- NO, not working now
                             //combineCLIPWithMongo = true;
                             //msg.content.resultsperpage = msg.content.maxresults;
                             clipWebSocket.send(JSON.stringify(msg));
@@ -223,11 +209,9 @@ wss.on('connection', (ws) => {
                     }
                 } else if (msg.content.type === 'similarityquery') {
                     combineCLIPWithMongo = false;
-                    //filterCLIPResultsByDate = false;
                     clipWebSocket.send(JSON.stringify(msg));
                 } else if (msg.content.type === 'file-similarityquery') {
                     combineCLIPWithMongo = false;
-                    //filterCLIPResultsByDate = false;
                     clipWebSocket.send(JSON.stringify(msg));
                 } else if (msg.content.type === 'metadataquery') {
                     queryImage(msg.content.imagepath).then((queryResults) => {
@@ -246,7 +230,7 @@ wss.on('connection', (ws) => {
                         }
                     });
                 } 
-                else if (msg.content.type === 'objects') {
+                /*else if (msg.content.type === 'objects') {
                     queryObjects(clientId);
                 }
                 else if (msg.content.type === 'concepts') {
@@ -254,7 +238,7 @@ wss.on('connection', (ws) => {
                 }
                 else if (msg.content.type === 'places') {
                     queryPlaces(clientId);
-                }
+                }*/
                 else if (msg.content.type === 'texts') {
                     queryTexts(clientId);
                 }
@@ -549,55 +533,6 @@ function handleCLIPResponse(message) {
         
     }
     else {
-
-        /*
-        if (filterCLIPResultsByDate === true || queryMode !== 'all') {
-
-            console.log('filter query');
-            let ly = year.toString().trim().length;
-            let lm = month.toString().trim().length;
-            let ld = day.toString().trim().length;
-            let lw = weekday.toString().trim().length;
-
-            const dateSet = new Set();
-        
-            if (ly > 0 || lm > 0 || ld > 0 || lw > 0 || queryMode !== 'all') {
-                for (let i = 0; i < msg.results.length; i++) {
-                    const elem = msg.results[i];
-                    let eyear = elem.substring(0,4);
-                    let emonth = elem.substring(4,6);
-                    let eday = elem.substring(7,9);
-        
-                    if (ly > 0 && eyear !== year) {
-                        msg.results.splice(i--, 1);
-                    }
-                    else if (lm > 0 && emonth !== month) {
-                        msg.results.splice(i--, 1);
-                    }
-                    else if (ld > 0 && eday !== day) {
-                        msg.results.splice(i--, 1);
-                    }
-                    else if (queryMode === 'first') {
-                        let dateStr = eyear + emonth + eday;
-                        if (dateSet.has(dateStr)) {
-                            msg.results.splice(i--,1);
-                        } else {
-                            dateSet.add(dateStr);
-                        }
-                    }
-                    else if (lw > 0) {
-                        let dstr = eyear + '-' + emonth + '-' + eday;
-                        let edate = new Date(dstr);
-                        let wd = edate.getDay();
-                        
-                        if (weekdays[wd] === weekday) {
-                            msg.results.splice(i--, 1);
-                        }
-                    }
-                }
-            }
-        }
-        */
         let filteredResults = Array();
         let videoIds = Array();
         for (let i = 0; i < msg.results.length; i++) {
@@ -850,97 +785,6 @@ async function queryImage(url) {
         
             queryResults.results = results;
             return queryResults;
-        }
-  
-    } catch (error) {
-        console.log("error with mongodb: " + error);
-        await mongoclient.close();
-    } finally {
-      // Close the MongoDB connection when finished
-      //await mongoclient.close();
-    }
-}
-
-
-async function queryObjects(clientId) {
-    try {
-        if (!mongoclient.isConnected()) {
-            console.log('mongodb not connected!');
-            connectMongoDB();
-        } else {
-            const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
-            const collection = database.collection('objects'); // Replace with your collection name
-        
-            const cursor = collection.find({},{name:1}).sort({name: 1});
-            let results = [];
-            await cursor.forEach(document => {
-                results.push(document);
-            });
-            
-            let response = { "type": "objects", "num": results.length, "results": results };
-            clientWS = clients.get(clientId);
-            clientWS.send(JSON.stringify(response));
-            //console.log('sent back: ' + JSON.stringify(response));
-        }
-  
-    } catch (error) {
-        console.log("error with mongodb: " + error);
-        await mongoclient.close();
-    } finally {
-      // Close the MongoDB connection when finished
-      //await mongoclient.close();
-    }
-  }
-
-async function queryConcepts(clientId) {
-    try {
-        if (!mongoclient.isConnected()) {
-            console.log('mongodb not connected!');
-            connectMongoDB();
-        } else {
-            const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
-            const collection = database.collection('concepts'); // Replace with your collection name
-        
-            const cursor = collection.find({},{name:1}).sort({name: 1});
-            let results = [];
-            await cursor.forEach(document => {
-                results.push(document);
-            });
-            
-            let response = { "type": "concepts", "num": results.length, "results": results };
-            clientWS = clients.get(clientId);
-            clientWS.send(JSON.stringify(response));
-            //console.log('sent back: ' + JSON.stringify(response));
-        }
-  
-    } catch (error) {
-        console.log("error with mongodb: " + error);
-        await mongoclient.close();
-    } finally {
-      // Close the MongoDB connection when finished
-      //await mongoclient.close();
-    }
-}
-
-async function queryPlaces(clientId) {
-    try {
-        if (!mongoclient.isConnected()) {
-            console.log('mongodb not connected!');
-            connectMongoDB();
-        } else {
-            const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
-            const collection = database.collection('places'); // Replace with your collection name
-        
-            const cursor = collection.find({},{name:1}).sort({name: 1});
-            let results = [];
-            await cursor.forEach(document => {
-                results.push(document);
-            });
-            
-            let response = { "type": "places", "num": results.length, "results": results };
-            clientWS = clients.get(clientId);
-            clientWS.send(JSON.stringify(response));
-            //console.log('sent back: ' + JSON.stringify(response));
         }
   
     } catch (error) {
