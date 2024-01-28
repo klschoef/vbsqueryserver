@@ -149,7 +149,7 @@ wss.on('connection', (ws) => {
 
                     nodequery = msg.content.query;
 
-                    //queryMode = msg.content.queryMode;
+                    queryMode = msg.content.queryMode;
 
                     lenBefore = msg.content.query.trim().length;
                     clipQuery = parseParameters(msg.content.query)
