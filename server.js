@@ -32,9 +32,10 @@ connectMongoDB();
 let text, concept, object, place, year, month, day, weekday, filename, similarto;
 
 class QuerySettings {
-    constructor(combineCLIPwithMongo = false, combineCLIPwithCLIP = 0) {
+    constructor(combineCLIPwithMongo = false, combineCLIPwithCLIP = 0, videoFiltering = 'all') {
         this.combineCLIPwithMongo = combineCLIPwithMongo;
         this.combineCLIPwithCLIP = combineCLIPwithCLIP;
+        this.videoFiltering = videoFiltering;
     }
 }
 
@@ -113,6 +114,14 @@ wss.on('connection', (ws) => {
             clipWebSocket = clipWebSocketLHE;
         }
 
+        //check video filtering
+        videoFiltering = msg.content.videofiltering;
+        clientSettings.videoFiltering = videoFiltering;
+        if (videoFiltering == 'first') {
+            msg.content.resultsperpage = msg.content.maxresults;
+            msg.content.selectedpage = 1;
+        }
+
         if (msg.content.type === 'clusters') {
             queryClusters(clientId);
         } else if (msg.content.type === 'videoinfo') {
@@ -144,9 +153,7 @@ wss.on('connection', (ws) => {
                 if (msg.content.type === 'textquery') {
                     lenBefore = msg.content.query.trim().length;
                     clipQuery = parseParameters(msg.content.query)
-
-                    videofiltering = msg.content.videofiltering;
-                    
+ 
                     if (clipQuery.trim().length > 0) {
                         msg.content.query = clipQuery
                         msg.content.clientId = clientId
@@ -193,10 +200,8 @@ wss.on('connection', (ws) => {
                         }   
                     }
                 } else if (msg.content.type === 'similarityquery') {
-                    clientSettings.combineCLIPwithMongo = false;
                     clipWebSocket.send(JSON.stringify(msg));
                 } else if (msg.content.type === 'file-similarityquery') {
-                    clientSettings.combineCLIPwithMongo = false;
                     clipWebSocket.send(JSON.stringify(msg));
                 }
             }
@@ -388,7 +393,9 @@ function handleCLIPResponse(message) {
     console.log('received %s results from CLIP server', msg.num);
 
     if (clientSettings.combineCLIPwithMongo === true) {
-
+        //========================
+        //currently not used by the client!
+        //========================
         console.log('combined query');
         let combinedResults = [];
 
@@ -447,19 +454,30 @@ function handleCLIPResponse(message) {
             let jointResults = Array();
             let jointResultsIdx = Array();
             let jointScores = Array();
+            let videoIds = Array();
+
             for (let r = 1; r < pendingCLIPResults.length; r++) {
                 let tresPrev = pendingCLIPResults[r-1].results;
                 let tres = pendingCLIPResults[r].results;
                 let tresIdx = pendingCLIPResults[r].resultsidx;
                 let tresScores = pendingCLIPResults[r].scores;
+
                 for (let i = 0; i < tres.length; i++) {
                     let vid = tres[i].substring(0,11);
                     let frame = parseInt(tres[i].substring(12,tres[i].indexOf('.')));
+                    
                     for (let j = 0; j < tresPrev.length; j++) {
                         let vidP = tresPrev[j].substring(0,11);
                         let frameP = parseInt(tresPrev[j].substring(12,tres[i].indexOf('.')));
 
                         if (vid == vidP && frame > frameP) {
+
+                            let videoid = getVideoId(tres[i]);
+                            if (clientSettings.videofiltering === 'first' && videoIds.includes(videoid)) {
+                                continue;
+                            }
+                            videoIds.push(videoid);
+
                             jointResults.push(tres[i]);
                             jointResultsIdx.push(tresIdx[i]);
                             jointScores.push(tresScores[i]);
@@ -484,12 +502,12 @@ function handleCLIPResponse(message) {
         let videoIds = Array();
         for (let i = 0; i < msg.results.length; i++) {
             let videoid = getVideoId(msg.results[i]);
-            if (videofiltering === 'first' && videoIds.includes(videoid)) {
+            if (clientSettings.videofiltering === 'first' && videoIds.includes(videoid)) {
                 continue;
             }
             videoIds.push(videoid);
             filteredResults.push(msg.results[i]);
-        } 
+        }
 
         //msg.totalresults = filteredResults.length;
         msg.results = filteredResults;
@@ -783,8 +801,13 @@ async function queryVideoID(clientId, queryInput) {
         if (cursor) {
             let results = [];
             let scores = [];
+            let videoIds = Array();
             await cursor.forEach(document => {
                 for(const shot of document.shots) {
+                    if (clientSettings.videofiltering === 'first' && videoIds.includes(document.videoid)) {
+                        continue;
+                    }
+                    videoIds.push(document.videoid);
                     results.push(document.videoid + '/' + shot.keyframe);
                     scores.push(1);
                 }
@@ -824,8 +847,13 @@ async function queryMetadata(clientId, queryInput) {
         
         let results = [];
         let scores = [];
+        let videoIds = Array();
         await cursor.forEach(document => {
             for(const shot of document.shots) {
+                if (clientSettings.videofiltering === 'first' && videoIds.includes(document.videoid)) {
+                    continue;
+                }
+                videoIds.push(document.videoid);
                 results.push(document.videoid + '/' + shot.keyframe);
                 scores.push(1);
             }
@@ -859,8 +887,13 @@ async function querySpeech(clientId, queryInput) {
         
         let results = [];
         let scores = [];
+        let videoIds = Array();
         await cursor.forEach(document => {
             for(const shot of document.shots) {
+                if (clientSettings.videofiltering === 'first' && videoIds.includes(document.videoid)) {
+                    continue;
+                }
+                videoIds.push(document.videoid);
                 results.push(document.videoid + '/' + shot.keyframe);
                 scores.push(1);
             }
