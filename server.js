@@ -829,7 +829,9 @@ async function queryVideoID(clientId, queryInput) {
             cursor = await collection.find({ videoid: { $regex: 'LHE??'}}).sort({ videoid: 1 });
         } else if (queryInput.query === '*' && queryInput.dataset === 'mvk' && queryInput.videofiltering === 'first') {
             cursor = await collection.find({ videoid: { $regex: '.*_.*_.*'}}).sort({ videoid: 1 });
-        } else if (queryInput.query !== '*') {
+        } else if (queryInput.query === '*' && queryInput.dataset === 'v3c' && queryInput.videofiltering === 'first') {
+            cursor = await collection.find({ videoid: { $regex: /^\d{5}$/} }).sort({ videoid: 1 });
+        } else { //if (queryInput.query !== '*') {
             cursor = await collection.find({ videoid: { $regex: queryInput.query, $options: "i" } }).sort({ videoid: 1 });;
         }
 
