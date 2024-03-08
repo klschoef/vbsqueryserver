@@ -120,3 +120,4 @@ local-config.js
 lscqueryserverlog.json
 
 *log.json
+local-config-example.js
