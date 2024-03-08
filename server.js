@@ -9,11 +9,11 @@ const LOGFILE = 'vbsqueryserverlog.json'
 
 const DISTINCTIVE_L2DIST1 = 10.0;
 const DISTINCTIVE_L2DIST2 = 15.0;
-const CLIPSERVERURLV3C = 'ws://' + config.config_CLIP_SERVER_V3C; 
+const CLIPSERVERURLV3C = 'ws://' + config.config_CLIP_SERVER_V3C;
 console.log(CLIPSERVERURLV3C);
-const CLIPSERVERURLMVK = 'ws://' + config.config_CLIP_SERVER_MVK; 
+const CLIPSERVERURLMVK = 'ws://' + config.config_CLIP_SERVER_MVK;
 console.log(CLIPSERVERURLMVK);
-const CLIPSERVERURLLHE = 'ws://' + config.config_CLIP_SERVER_LHE; 
+const CLIPSERVERURLLHE = 'ws://' + config.config_CLIP_SERVER_LHE;
 console.log(CLIPSERVERURLLHE);
 
 const wss = new WebSocket.Server({ noServer: true }); //web socket to client
@@ -69,7 +69,7 @@ function generateUniqueClientId() {
 let clients = new Map(); // This map stores the associations between client IDs and their WebSocket connections
 wss.on('connection', (ws) => {
     // WebSocket connection handling logic
-    
+
     let clientId = generateUniqueClientId(); // You would need to implement this function
     clients.set(clientId, ws);
     console.log('client connected: %s', clientId);
@@ -93,7 +93,6 @@ wss.on('connection', (ws) => {
     ws.on('message', (message) => {
         console.log('received from client: %s (%s)', message, clientId);
         // Handle the received message as needed
-
         msg = JSON.parse(message);
 
         //logging
@@ -103,109 +102,48 @@ wss.on('connection', (ws) => {
             }
         });
 
-        let clipWebSocket = null;
-        if (msg.content.dataset == 'v3c') {
-            clipWebSocket = clipWebSocketV3C;
-        } else if (msg.content.dataset == 'mvk') {
-            clipWebSocket = clipWebSocketMVK;
-        } else if (msg.content.dataset == 'lhe') {
-            clipWebSocket = clipWebSocketLHE;
-        }
-
         //check video filtering
         videoFiltering = msg.content.videofiltering;
         clientSettings.videoFiltering = videoFiltering;
+
         if (videoFiltering == 'first') {
             msg.content.resultsperpage = msg.content.maxresults;
             msg.content.selectedpage = 1;
         }
 
-        if (msg.content.type === 'clusters') {
-            queryClusters(clientId);
-        } else if (msg.content.type === 'videoinfo') {
-            getVideoInfo(clientId, msg.content);
-        } else if (msg.content.type === 'videofps') {
-            getVideoFPS(clientId, msg.content, msg.correlationId);
-        } else if (msg.content.type === 'videosummaries') {
-            getVideoSummaries(clientId, msg.content);
-        } else if (msg.content.type === 'ocr-text') {
-            queryOCRText(clientId, msg.content);
-        } else if (msg.content.type === 'metadata') {
-            queryMetadata(clientId, msg.content);
-        } else if (msg.content.type === 'speech') {
-            querySpeech(clientId, msg.content);
-        } else if (msg.content.type === 'videoid') {
-            queryVideoID(clientId, msg.content);
-        } else if (msg.content.type === 'clusters') {
-            queryClusters(clientId);
-        } else if (msg.content.type === 'cluster') {
-            queryCluster(clientId, msg.content);
-        } else {
-            //check CLIPserver connection
-            if (clipWebSocket === null) {
-                console.log('clipWebSocket is null');
-            } else {
-                // Append jsonString to the file
-                msg.clientId = clientId; //give client a unique id on the node server (and set it for every msg)
-                
-                if (msg.content.type === 'textquery') {
-                    lenBefore = msg.content.query.trim().length;
-                    clipQuery = parseParameters(msg.content.query)
- 
-                    if (clipQuery.trim().length > 0) {
-                        msg.content.query = clipQuery
-                        msg.content.clientId = clientId
-
-                        if (clipQuery.length !== lenBefore) { //msg.content.query.trim().length || isOnlyDateFilter()) {
-                            msg.content.resultsperpage = msg.content.maxresults;
-                        }
-
-                        console.log('sending to CLIP server: "%s" len=%d content-len=%d (rpp=%d, max=%d) - %d %d %d', clipQuery, clipQuery.length, msg.content.query.length, msg.content.resultsperpage, msg.content.maxresults, clipQuery.length, msg.content.query.trim().length, lenBefore);
-                        
-                        let clipQueries = Array();
-                        let tmpClipQuery = clipQuery;
-                        if (tmpClipQuery.includes('<')) {
-                            let idxS = -1;
-                            do {
-                                idxS = tmpClipQuery.indexOf('<');
-                                if (idxS > -1) {
-                                    clipQueries.push(tmpClipQuery.substring(0,idxS));
-                                    tmpClipQuery = tmpClipQuery.substring(idxS+1);
-                                } else {
-                                    clipQueries.push(tmpClipQuery); //last one
-                                }
-                            } while (idxS > -1);
-                            console.log('found ' + clipQueries.length + ' temporal queries:');
-                            for (let i=0; i < clipQueries.length; i++) {
-                                console.log(clipQueries[i]);
-                            }
-                        }
-
-                        if (clipQueries.length > 0) {
-                            clientSettings.combineCLIPwithCLIP = clipQueries.length;
-                            for (let i=0; i < clipQueries.length; i++) {
-                                let tmsg = msg;
-                                tmsg.content.query = clipQueries[i];
-                                tmsg.content.resultsperpage = tmsg.content.maxresults;
-                                clipWebSocket.send(JSON.stringify(tmsg));
-                            }
-                            clipQueries = Array();
-                        } else {
-                            //C L I P   +   D B   Q U E R Y  <---- NO, not working now
-                            //clientSettings.combineCLIPwithMongo = true
-                            //msg.content.resultsperpage = msg.content.maxresults;
-                            clipWebSocket.send(JSON.stringify(msg));
-                        }   
-                    }
-                } else if (msg.content.type === 'similarityquery') {
-                    clipWebSocket.send(JSON.stringify(msg));
-                } else if (msg.content.type === 'file-similarityquery') {
-                    clipWebSocket.send(JSON.stringify(msg));
-                }
-            }
+        switch (msg.content.type) {
+            case 'clusters':
+                queryClusters(clientId);
+                break;
+            case 'cluster':
+                queryCluster(clientId, msg.content);
+                break;
+            case 'videoinfo':
+                getVideoInfo(clientId, msg.content);
+                break;
+            case 'videofps':
+                getVideoFPS(clientId, msg.content, msg.correlationId);
+                break;
+            case 'videosummaries':
+                getVideoSummaries(clientId, msg.content);
+                break;
+            case 'ocr-text':
+                queryOCRText(clientId, msg.content);
+                break;
+            case 'metadata':
+                queryMetadata(clientId, msg.content);
+                break;
+            case 'speech':
+                querySpeech(clientId, msg.content);
+                break;
+            case 'videoid':
+                queryVideoID(clientId, msg.content);
+                break;
+            default:
+                handleDefaultCase(clientId, msg);
         }
     });
-    
+
     ws.on('close', function close() {
         console.log('client disconnected');
         // Close the MongoDB connection when finished
@@ -213,6 +151,83 @@ wss.on('connection', (ws) => {
     });
 });
 
+function handleDefaultCase(clientId, msg) {
+    let clipWebSocket = null;
+
+    if (msg.content.dataset == 'v3c') {
+        clipWebSocket = clipWebSocketV3C;
+    } else if (msg.content.dataset == 'mvk') {
+        clipWebSocket = clipWebSocketMVK;
+    } else if (msg.content.dataset == 'lhe') {
+        clipWebSocket = clipWebSocketLHE;
+    }
+
+    //check CLIPserver connection
+    if (clipWebSocket === null) {
+        console.log('clipWebSocket is null');
+        return;
+    }
+    // Append jsonString to the file
+    msg.clientId = clientId; //give client a unique id on the node server (and set it for every msg)
+
+    if (msg.content.type === 'textquery') {
+        handleTextQuery(clientId, msg, clipWebSocket);
+    } else if (['similarityquery', 'file-similarityquery'].includes(msg.content.type)) {
+        clipWebSocket.send(JSON.stringify(msg));
+    }
+}
+
+/* TODO: Refactor this */
+function handleTextQuery(clientId, msg, clipWebSocket) {
+    lenBefore = msg.content.query.trim().length;
+    clipQuery = parseParameters(msg.content.query)
+
+    if (clipQuery.trim().length > 0) {
+        msg.content.query = clipQuery
+        msg.content.clientId = clientId
+
+        if (clipQuery.length !== lenBefore) { //msg.content.query.trim().length || isOnlyDateFilter()) {
+            msg.content.resultsperpage = msg.content.maxresults;
+        }
+
+        console.log('sending to CLIP server: "%s" len=%d content-len=%d (rpp=%d, max=%d) - %d %d %d', clipQuery, clipQuery.length, msg.content.query.length, msg.content.resultsperpage, msg.content.maxresults, clipQuery.length, msg.content.query.trim().length, lenBefore);
+
+        let clipQueries = Array();
+        let tmpClipQuery = clipQuery;
+        if (tmpClipQuery.includes('<')) {
+            let idxS = -1;
+            do {
+                idxS = tmpClipQuery.indexOf('<');
+                if (idxS > -1) {
+                    clipQueries.push(tmpClipQuery.substring(0, idxS));
+                    tmpClipQuery = tmpClipQuery.substring(idxS + 1);
+                } else {
+                    clipQueries.push(tmpClipQuery); //last one
+                }
+            } while (idxS > -1);
+            console.log('found ' + clipQueries.length + ' temporal queries:');
+            for (let i = 0; i < clipQueries.length; i++) {
+                console.log(clipQueries[i]);
+            }
+        }
+
+        if (clipQueries.length > 0) {
+            clientSettings.combineCLIPwithCLIP = clipQueries.length;
+            for (let i = 0; i < clipQueries.length; i++) {
+                let tmsg = msg;
+                tmsg.content.query = clipQueries[i];
+                tmsg.content.resultsperpage = tmsg.content.maxresults;
+                clipWebSocket.send(JSON.stringify(tmsg));
+            }
+            clipQueries = Array();
+        } else {
+            //C L I P   +   D B   Q U E R Y  <---- NO, not working now
+            //clientSettings.combineCLIPwithMongo = true
+            //msg.content.resultsperpage = msg.content.maxresults;
+            clipWebSocket.send(JSON.stringify(msg));
+        }
+    }
+}
 
 //////////////////////////////////////////////////////////////////
 // Parameter Parsing
@@ -221,7 +236,7 @@ wss.on('connection', (ws) => {
 function parseParameters(inputString) {
     // Define the regex pattern to match parameters and their values
     const regex = /-([a-zA-Z]+)\s(\S+)/g;
-    
+
     text = concept = object = place = year = month = day = weekday = filename = similarto = '';
 
     // Iterate over matches
@@ -277,7 +292,7 @@ function parseParameters(inputString) {
     const updatedString = inputString.replace(regex, '').trim();
 
     return updatedString.trim();
-} 
+}
 
 
 
@@ -293,14 +308,14 @@ function connectToCLIPServerV3C() {
         clipWebSocketV3C.on('open', () => {
             console.log('connected to CLIP ' + dataset + ' server');
         })
-        
+
         clipWebSocketV3C.on('close', (event) => {
             // Handle connection closed
             clipWebSocketV3C.close();
             clipWebSocketV3C = null;
             console.log('Connection to CLIP ' + dataset + ' closed', event.code, event.reason);
         });
-        
+
         pendingCLIPResults = Array();
 
         clipWebSocketV3C.on('message', (message) => {
@@ -311,8 +326,8 @@ function connectToCLIPServerV3C() {
             console.log('Connection to CLIP ' + dataset + ' refused');
         });
 
-    } catch(error) {
-        console.log("Cannot connect to CLIP ' + dataset + ' server");   
+    } catch (error) {
+        console.log("Cannot connect to CLIP ' + dataset + ' server");
     }
 }
 
@@ -325,14 +340,14 @@ function connectToCLIPServerMVK() {
         clipWebSocketMVK.on('open', () => {
             console.log('connected to CLIP ' + dataset + ' server');
         })
-        
+
         clipWebSocketMVK.on('close', (event) => {
             // Handle connection closed
             clipWebSocketMVK.close();
             clipWebSocketMVK = null;
             console.log('Connection to CLIP ' + dataset + ' closed', event.code, event.reason);
         });
-        
+
         pendingCLIPResults = Array();
 
         clipWebSocketMVK.on('message', (message) => {
@@ -343,8 +358,8 @@ function connectToCLIPServerMVK() {
             console.log('Connection to CLIP ' + dataset + ' refused');
         });
 
-    } catch(error) {
-        console.log("Cannot connect to CLIP ' + dataset + ' server");   
+    } catch (error) {
+        console.log("Cannot connect to CLIP ' + dataset + ' server");
     }
 }
 
@@ -357,14 +372,14 @@ function connectToCLIPServerLHE() {
         clipWebSocketLHE.on('open', () => {
             console.log('connected to CLIP ' + dataset + ' server');
         })
-        
+
         clipWebSocketLHE.on('close', (event) => {
             // Handle connection closed
             clipWebSocketLHE.close();
             clipWebSocketLHE = null;
             console.log('Connection to CLIP ' + dataset + ' closed', event.code, event.reason);
         });
-        
+
         pendingCLIPResults = Array();
 
         clipWebSocketLHE.on('message', (message) => {
@@ -375,8 +390,8 @@ function connectToCLIPServerLHE() {
             console.log('Connection to CLIP ' + dataset + ' refused');
         });
 
-    } catch(error) {
-        console.log("Cannot connect to CLIP ' + dataset + ' server");   
+    } catch (error) {
+        console.log("Cannot connect to CLIP ' + dataset + ' server");
     }
 }
 
@@ -399,7 +414,7 @@ function handleCLIPResponse(message) {
 
         const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
-        var { query, projection } = getMongoQuery(year, month, day, weekday, text, concept, object, place, filename); 
+        var { query, projection } = getMongoQuery(year, month, day, weekday, text, concept, object, place, filename);
         console.log('(1) mongodb query: %s', JSON.stringify(query));
         const sortCriteria = { filepath: 1 }; //-1 for desc
         collection.find(query, projection).sort(sortCriteria).toArray((error, documents) => {
@@ -408,7 +423,7 @@ function handleCLIPResponse(message) {
             }
 
             console.log('got %d results from mongodb', documents.length);
-            let processingInfo = {"type": "info",  "num": 1, "totalresults": 1, "message": documents.length + " results in database, now filtering..."};
+            let processingInfo = { "type": "info", "num": 1, "totalresults": 1, "message": documents.length + " results in database, now filtering..." };
             clientWS.send(JSON.stringify(processingInfo));
 
             const dateSet = new Set();
@@ -444,7 +459,7 @@ function handleCLIPResponse(message) {
 
         });
 
-    } 
+    }
     else if (clientSettings.combineCLIPwithCLIP > 0) {
         pendingCLIPResults.push(msg);
         clientSettings.combineCLIPwithCLIP--;
@@ -456,7 +471,7 @@ function handleCLIPResponse(message) {
             let countFiltered = 0;
 
             for (let r = 1; r < pendingCLIPResults.length; r++) {
-                let tresPrev = pendingCLIPResults[r-1].results;
+                let tresPrev = pendingCLIPResults[r - 1].results;
                 let tres = pendingCLIPResults[r].results;
                 let tresIdx = pendingCLIPResults[r].resultsidx;
                 let tresScores = pendingCLIPResults[r].scores;
@@ -464,7 +479,7 @@ function handleCLIPResponse(message) {
                 for (let i = 0; i < tres.length; i++) {
                     let vid = getVideoId(tres[i]); //tres[i].substring(0,11);
                     let frame = extractFrameNumber(tres[i]); //parseInt(tres[i].substring(12,tres[i].indexOf('.')));
-                    
+
                     for (let j = 0; j < tresPrev.length; j++) {
                         let vidP = getVideoId(tresPrev[j]); //tresPrev[j].substring(0,11);
                         let frameP = extractFrameNumber(tresPrev[j]); //parseInt(tresPrev[j].substring(12,tres[i].indexOf('.')));
@@ -492,12 +507,12 @@ function handleCLIPResponse(message) {
             msg.scores = jointScores;
             msg.totalresults = jointResults.length;
             msg.num = jointResults.length;
-            msg.totalresults =  jointResults.length;
+            msg.totalresults = jointResults.length;
             console.log('forwarding %d joint results to client %s', msg.totalresults, clientId);
             pendingCLIPResults = Array();
             clientWS.send(JSON.stringify(msg));
         }
-        
+
     }
     else {
         let filteredResults = Array();
@@ -523,7 +538,7 @@ function handleCLIPResponse(message) {
         msg.scores = filteredScores;
         msg.totalresults = msg.totalresults - countFiltered;
         msg.num = msg.num - countFiltered;
-        
+
         /*numafter = msg.results.length;
         if (numafter !== numbefore) {
             msg.totalresults = msg.totalresults - (numafter - numbefore); //msg.results.length;
@@ -671,19 +686,19 @@ function getMongoQuery(yearValue, monthValue, dayValue, weekdayValue, textValue,
     return { query, projection };
 }
 
-  
+
 async function queryClusters(clientId) {
     try {
         let clientSettings = settingsMap.get(clientId);
         const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('clusters'); // Replace with your collection name
-    
-        const cursor = collection.find().sort({'members': -1});
+
+        const cursor = collection.find().sort({ 'members': -1 });
         let results = [];
         await cursor.forEach(document => {
             results.push(document);
         });
-        
+
         let response = { "type": "concepts", "num": results.length, "results": results };
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
@@ -701,12 +716,12 @@ async function getVideoFPS(clientId, queryInput, correlationId) {
         const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
         const collection = database.collection('videos'); // Replace with your collection name
 
-        let projection = {fps: 1, duration: 1};
+        let projection = { fps: 1, duration: 1 };
 
         let query = {};
-        query = {'videoid': queryInput.videoid};
+        query = { 'videoid': queryInput.videoid };
 
-        const cursor = collection.find(query, {projection: projection});
+        const cursor = collection.find(query, { projection: projection });
         let results = [];
         await cursor.forEach(document => {
             results.push(document);
@@ -717,12 +732,12 @@ async function getVideoFPS(clientId, queryInput, correlationId) {
         clientWS.send(JSON.stringify(response));
         //console.log('sent back fps info: ' + JSON.stringify(response))
 
-    }  catch (error) {
+    } catch (error) {
         console.log("error with mongodb: " + error);
         await mongoclient.close();
     } finally {
-      // Close the MongoDB connection when finished
-      //await mongoclient.close();
+        // Close the MongoDB connection when finished
+        //await mongoclient.close();
     }
 }
 
@@ -734,7 +749,7 @@ async function getVideoInfo(clientId, queryInput) {
         const collection = database.collection('videos'); // Replace with your collection name
 
         let query = {};
-        query = {'videoid': queryInput.videoid};
+        query = { 'videoid': queryInput.videoid };
 
         const cursor = collection.find(query);
         let results = [];
@@ -747,12 +762,12 @@ async function getVideoInfo(clientId, queryInput) {
         clientWS.send(JSON.stringify(response));
         //console.log('sent back: ' + JSON.stringify(response))
 
-    }  catch (error) {
+    } catch (error) {
         console.log("error with mongodb: " + error);
         await mongoclient.close();
     } finally {
-      // Close the MongoDB connection when finished
-      //await mongoclient.close();
+        // Close the MongoDB connection when finished
+        //await mongoclient.close();
     }
 }
 
@@ -763,9 +778,9 @@ async function getVideoSummaries(clientId, queryInput) {
         const collection = database.collection('videos'); // Replace with your collection name
 
         let query = {};
-        query = {'videoid': queryInput.videoid};
+        query = { 'videoid': queryInput.videoid };
 
-        const cursor = collection.find(query).project({_id:0,videoid:1,summaries:1});
+        const cursor = collection.find(query).project({ _id: 0, videoid: 1, summaries: 1 });
         let results = [];
         await cursor.forEach(document => {
             results.push(document);
@@ -776,10 +791,10 @@ async function getVideoSummaries(clientId, queryInput) {
         clientWS.send(JSON.stringify(response));
         //console.log('sent back: ' + JSON.stringify(response))
 
-    }  catch (error) {
+    } catch (error) {
         console.log("error with mongodb: " + error);
         await mongoclient.close();
-    } 
+    }
 }
 
 async function queryOCRText(clientId, queryInput) {
@@ -790,13 +805,13 @@ async function queryOCRText(clientId, queryInput) {
 
         // Find the document with the matching text
         //const document = await collection.findOne({ text: {"$regex": queryInput.query, "$options": "i" }});
-        const document = await collection.findOne({ text: {$regex: new RegExp(queryInput.query, "i")} });
+        const document = await collection.findOne({ text: { $regex: new RegExp(queryInput.query, "i") } });
         let response = { "type": "ocr-text", "num": 0, "results": [], "totalresults": 0, "scores": [], "dataset": "v3c" };
-        
+
         if (document) {
             response.num = document.frames.length;
             response.results = document.frames;
-            response.totalresults = response.num;   
+            response.totalresults = response.num;
 
             if (clientSettings.videoFiltering === 'first') {
                 let filteredFrames = [];
@@ -813,16 +828,16 @@ async function queryOCRText(clientId, queryInput) {
                 response.results = filteredFrames;
             }
 
-            response.scores  = new Array(document.frames.length).fill(1);
+            response.scores = new Array(document.frames.length).fill(1);
         }
 
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
 
-    }  catch (error) {
+    } catch (error) {
         console.log("error with mongodb: " + error);
         await mongoclient.close();
-    } 
+    }
 }
 
 async function queryVideoID(clientId, queryInput) {
@@ -834,9 +849,9 @@ async function queryVideoID(clientId, queryInput) {
         // Find the document with the matching text
         let cursor;
         if (queryInput.query === '*' && queryInput.dataset === 'lhe' && queryInput.videofiltering === 'first') {
-            cursor = await collection.find({ videoid: { $regex: 'LHE??'}}).sort({ videoid: 1 });
+            cursor = await collection.find({ videoid: { $regex: 'LHE??' } }).sort({ videoid: 1 });
         } else if (queryInput.query === '*' && queryInput.dataset === 'mvk' && queryInput.videofiltering === 'first') {
-            cursor = await collection.find({ videoid: { $regex: '.*_.*_.*'}}).sort({ videoid: 1 });
+            cursor = await collection.find({ videoid: { $regex: '.*_.*_.*' } }).sort({ videoid: 1 });
         } /*else if (queryInput.query === '*' && queryInput.dataset === 'v3c' && queryInput.videofiltering === 'first') {
             cursor = await collection.find({ videoid: { $regex: /^\d{5}$/} }).sort({ videoid: 1 });
         } */else if (queryInput.query !== '*') {
@@ -844,13 +859,13 @@ async function queryVideoID(clientId, queryInput) {
         }
 
         let response = { "type": "videoid", "num": 0, "results": [], "totalresults": 0, "scores": [], "dataset": "v3c" };
-    
+
         if (cursor !== undefined) {
             let results = [];
             let scores = [];
             let videoIds = Array();
             await cursor.forEach(document => {
-                for(const shot of document.shots) {
+                for (const shot of document.shots) {
                     if (clientSettings.videoFiltering === 'first' && videoIds.includes(document.videoid)) {
                         continue;
                     }
@@ -859,21 +874,21 @@ async function queryVideoID(clientId, queryInput) {
                     scores.push(1);
                 }
             });
-            
+
             response.num = results.length;
             response.totalresults = results.length;
             response.scores = scores;
             response.results = results;
-        
+
         }
 
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
 
-    }  catch (error) {
+    } catch (error) {
         console.log("error with mongodb: " + error);
         await mongoclient.close();
-    } 
+    }
 }
 
 async function queryMetadata(clientId, queryInput) {
@@ -892,12 +907,12 @@ async function queryMetadata(clientId, queryInput) {
                 { tags: { $regex: regexQuery } }
             ]
         });
-        
+
         let results = [];
         let scores = [];
         let videoIds = Array();
         await cursor.forEach(document => {
-            for(const shot of document.shots) {
+            for (const shot of document.shots) {
                 if (clientSettings.videoFiltering === 'first' && videoIds.includes(document.videoid)) {
                     continue;
                 }
@@ -906,17 +921,17 @@ async function queryMetadata(clientId, queryInput) {
                 scores.push(1);
             }
         });
-        
+
 
         let response = { "type": "metadata", "num": results.length, "results": results, "totalresults": results.length, "scores": scores, "dataset": "v3c" };
 
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
 
-    }  catch (error) {
+    } catch (error) {
         console.log("error with mongodb: " + error);
         await mongoclient.close();
-    } 
+    }
 }
 
 async function querySpeech(clientId, queryInput) {
@@ -933,12 +948,12 @@ async function querySpeech(clientId, queryInput) {
                 { "speech.keywords": { $regex: regexQuery } },
             ]
         });
-        
+
         let results = [];
         let scores = [];
         let videoIds = Array();
         await cursor.forEach(document => {
-            for(const shot of document.shots) {
+            for (const shot of document.shots) {
                 if (clientSettings.videoFiltering === 'first' && videoIds.includes(document.videoid)) {
                     continue;
                 }
@@ -947,17 +962,17 @@ async function querySpeech(clientId, queryInput) {
                 scores.push(1);
             }
         });
-        
+
 
         let response = { "type": "speech", "num": results.length, "results": results, "totalresults": results.length, "scores": scores, "dataset": "v3c" };
 
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
 
-    }  catch (error) {
+    } catch (error) {
         console.log("error with mongodb: " + error);
         await mongoclient.close();
-    } 
+    }
 }
 
 async function queryClusters(clientId) {
@@ -967,8 +982,8 @@ async function queryClusters(clientId) {
         const collection = database.collection('clusters'); // Replace with your collection name
 
         // Fetch the clusters and sort them by the size of 'memberss' array (in descending order)
-        const cursor = collection.find({}).sort({ "count": -1 }).project({'cluster_id': 1, 'name': 1, 'count': 1});
-        
+        const cursor = collection.find({}).sort({ "count": -1 }).project({ 'cluster_id': 1, 'name': 1, 'count': 1 });
+
         // Converting cursor to array (You can also use forEach to avoid loading all into memory)
         const clusters = await cursor.toArray();
 
@@ -977,10 +992,10 @@ async function queryClusters(clientId) {
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
 
-    }  catch (error) {
+    } catch (error) {
         console.log("error with mongodb: " + error);
         await mongoclient.close();
-    } 
+    }
 }
 
 
@@ -991,11 +1006,11 @@ async function queryCluster(clientId, queryInput) {
         const collection = database.collection('clusters'); // Replace with your collection name
 
         // Fetch the clusters and sort them by the size of 'memberss' array (in descending order)
-        const document = await collection.findOne({'cluster_id': queryInput.query});
+        const document = await collection.findOne({ 'cluster_id': queryInput.query });
         let results = [];
         let scores = [];
         if (document) {
-            for(const member of document.members) {
+            for (const member of document.members) {
                 results.push(member);
                 scores.push(1);
             }
@@ -1006,9 +1021,9 @@ async function queryCluster(clientId, queryInput) {
         clientWS = clients.get(clientId);
         clientWS.send(JSON.stringify(response));
 
-    }  catch (error) {
+    } catch (error) {
         console.log("error with mongodb: " + error);
         await mongoclient.close();
-    } 
+    }
 }
 
