@@ -65,11 +65,12 @@ function generateUniqueClientId() {
     return uuidv4();
 }
 
+// This map stores the associations between client IDs and their WebSocket connections
+let clients = new Map(); 
 
-let clients = new Map(); // This map stores the associations between client IDs and their WebSocket connections
+// Handle the WebSocket connection
 wss.on('connection', (ws) => {
     // WebSocket connection handling logic
-
     let clientId = generateUniqueClientId(); // You would need to implement this function
     clients.set(clientId, ws);
     console.log('client connected: %s', clientId);
@@ -77,23 +78,21 @@ wss.on('connection', (ws) => {
     settingsMap.set(clientId, clientSettings);
 
     //check CLIPserver connection
-    if (clipWebSocketV3C === null) {
-        console.log('clipWebSocketV3C is null, try to re-connect');
-        connectToCLIPServerV3C();
-    }
-    if (clipWebSocketMVK === null) {
-        console.log('clipWebSocketMVK is null, try to re-connect');
-        connectToCLIPServerMVK();
-    }
-    if (clipWebSocketLHE === null) {
-        console.log('clipWebSocketLHE is null, try to re-connect');
-        connectToCLIPServerLHE();
-    }
+    ensureWebSocketConnection(clipWebSocketV3C, connectToCLIPServerV3C);
+    ensureWebSocketConnection(clipWebSocketMVK, connectToCLIPServerMVK);
+    ensureWebSocketConnection(clipWebSocketLHE, connectToCLIPServerLHE);
 
     ws.on('message', (message) => {
         console.log('received from client: %s (%s)', message, clientId);
         // Handle the received message as needed
-        msg = JSON.parse(message);
+        let msg;
+
+        try {
+            msg = JSON.parse(message);
+        } catch (error) {
+            console.log('error parsing message: ' + error);
+            return;
+        }
 
         //logging
         fs.appendFile(LOGFILE, JSON.stringify(msg), function (err) {
@@ -150,6 +149,13 @@ wss.on('connection', (ws) => {
         //mongoclient.close();
     });
 });
+
+function ensureWebSocketConnection(clipWebSocket, connectFunction) {
+    if (clipWebSocket === null) {
+        console.log('clipWebSocketV3C is null, try to re-connect');
+        connectFunction();
+    }
+}
 
 function handleDefaultCase(clientId, msg) {
     let clipWebSocket = null;
@@ -299,6 +305,7 @@ function parseParameters(inputString) {
 //////////////////////////////////////////////////////////////////
 // Connection to CLIP server
 //////////////////////////////////////////////////////////////////
+
 function connectToCLIPServerV3C() {
     let dataset = 'V3C';
     try {
