@@ -897,14 +897,22 @@ async function getVideoSummaries(clientId, queryInput) {
 async function queryOCRText(clientId, queryInput) {
   try {
     let clientSettings = settingsMap.get(clientId);
-    const database = mongoclient.db(config.config_MONGODB); // Replace with your database name
-    const collection = database.collection("texts"); // Replace with your collection name
+    const database = mongoclient.db(config.config_MONGODB);
+    const collection = database.collection("texts");
 
-    // Find the document with the matching text
-    //const document = await collection.findOne({ text: {"$regex": queryInput.query, "$options": "i" }});
-    const document = await collection.findOne({
+    const cursor = collection.find({
       text: { $regex: new RegExp(queryInput.query, "i") },
     });
+
+    let documents = await cursor.toArray();
+
+    // Manually sort the documents to prioritize exact matches. This makes sure that exact matches are on top.
+    documents.sort((a, b) => {
+      const aExact = a.text.toLowerCase() === queryInput.query.toLowerCase();
+      const bExact = b.text.toLowerCase() === queryInput.query.toLowerCase();
+      return bExact - aExact; 
+    });
+
     let response = {
       type: "ocr-text",
       num: 0,
@@ -914,27 +922,35 @@ async function queryOCRText(clientId, queryInput) {
       dataset: "v3c",
     };
 
-    if (document) {
-      response.num = document.frames.length;
-      response.results = document.frames;
-      response.totalresults = response.num;
+    if (documents.length > 0) {
+      let combinedFrames = new Set();
+      documents.forEach(doc => {
+        doc.frames.forEach(frame => combinedFrames.add(frame));
+      });
+      combinedFrames = Array.from(combinedFrames);
+
+      response.num = combinedFrames.length;
+      response.results = combinedFrames;
+      response.totalresults = combinedFrames.length;
+
+      console.log("found " + response.num + " results");
+      console.log("sending back: " + JSON.stringify(response));
 
       if (clientSettings.videoFiltering === "first") {
         let filteredFrames = [];
-        let videoIds = Array();
-        for (const frame of document.frames) {
+        let videoIds = [];
+        combinedFrames.forEach(frame => {
           let videoid = getVideoId(frame);
-          if (videoIds.includes(videoid)) {
-            continue;
+          if (!videoIds.includes(videoid)) {
+            videoIds.push(videoid);
+            filteredFrames.push(frame);
           }
-          videoIds.push(videoid);
-          filteredFrames.push(frame);
-        }
+        });
         response.num = filteredFrames.length;
         response.results = filteredFrames;
       }
 
-      response.scores = new Array(document.frames.length).fill(1);
+      response.scores = new Array(combinedFrames.length).fill(1);
     }
 
     clientWS = clients.get(clientId);
@@ -944,6 +960,7 @@ async function queryOCRText(clientId, queryInput) {
     await mongoclient.close();
   }
 }
+
 
 async function queryVideoID(clientId, queryInput) {
   try {
