@@ -900,58 +900,51 @@ async function queryOCRText(clientId, queryInput) {
     const database = mongoclient.db(config.config_MONGODB);
     const collection = database.collection("texts");
 
-    const cursor = collection.find({
-      text: { $regex: new RegExp(queryInput.query, "i") },
-    });
+    let words = queryInput.query.split(/\s+/); // Split query input into words
+    let commonFrames = new Set();
 
-    let documents = await cursor.toArray();
+    if (words.length === 1) {
+      // Use regex for single word
+      const cursor = collection.find({
+        text: { $regex: new RegExp(words[0], "i") },
+      });
+      let documents = await cursor.toArray();
 
-    // Manually sort the documents to prioritize exact matches. This makes sure that exact matches are on top.
-    documents.sort((a, b) => {
-      const aExact = a.text.toLowerCase() === queryInput.query.toLowerCase();
-      const bExact = b.text.toLowerCase() === queryInput.query.toLowerCase();
-      return bExact - aExact; 
-    });
+      // Prioritize exact matches to be at the top
+      documents.sort((a, b) => {
+        const aExact = a.text.toLowerCase() === words[0].toLowerCase();
+        const bExact = b.text.toLowerCase() === words[0].toLowerCase();
+        return bExact - aExact;
+      });
+
+      commonFrames = new Set(documents.flatMap((doc) => doc.frames));
+    } else {
+      // Use exact match for multiple words
+      const cursor = collection.find({
+        text: { $in: words },
+      });
+      let documents = await cursor.toArray();
+      let framesSets = documents.map((doc) => new Set(doc.frames));
+
+      // Find the intersection of all frame sets
+      if (framesSets.length > 0) {
+        commonFrames = framesSets.reduce(
+          (a, b) => new Set([...a].filter((x) => b.has(x)))
+        );
+      }
+    }
 
     let response = {
       type: "ocr-text",
-      num: 0,
-      results: [],
-      totalresults: 0,
-      scores: [],
+      num: commonFrames.size,
+      results: Array.from(commonFrames),
+      totalresults: commonFrames.size,
+      scores: new Array(commonFrames.size).fill(1),
       dataset: "v3c",
     };
 
-    if (documents.length > 0) {
-      let combinedFrames = new Set();
-      documents.forEach(doc => {
-        doc.frames.forEach(frame => combinedFrames.add(frame));
-      });
-      combinedFrames = Array.from(combinedFrames);
-
-      response.num = combinedFrames.length;
-      response.results = combinedFrames;
-      response.totalresults = combinedFrames.length;
-
-      console.log("found " + response.num + " results");
-      console.log("sending back: " + JSON.stringify(response));
-
-      if (clientSettings.videoFiltering === "first") {
-        let filteredFrames = [];
-        let videoIds = [];
-        combinedFrames.forEach(frame => {
-          let videoid = getVideoId(frame);
-          if (!videoIds.includes(videoid)) {
-            videoIds.push(videoid);
-            filteredFrames.push(frame);
-          }
-        });
-        response.num = filteredFrames.length;
-        response.results = filteredFrames;
-      }
-
-      response.scores = new Array(combinedFrames.length).fill(1);
-    }
+    console.log("found " + response.num + " results");
+    console.log("sending back: " + JSON.stringify(response));
 
     clientWS = clients.get(clientId);
     clientWS.send(JSON.stringify(response));
@@ -960,7 +953,6 @@ async function queryOCRText(clientId, queryInput) {
     await mongoclient.close();
   }
 }
-
 
 async function queryVideoID(clientId, queryInput) {
   try {
