@@ -169,6 +169,13 @@ wss.on("connection", (ws) => {
         videoId: submittedVideos,
         };
       broadCastMessage(updateMessage);
+    } else if(msg.content.type === "resetsubmission") {
+      submittedVideos = [];
+      let updateMessage = {
+        type: "updatesubmissions",
+        videoId: submittedVideos,
+      };
+      broadCastMessage(updateMessage);
     } else {
       //check CLIPserver connection
       if (clipWebSocket === null) {
