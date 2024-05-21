@@ -38,6 +38,9 @@ let text,
   filename,
   similarto;
 
+  //store submitted videos
+  let submittedVideos = [];
+
 class QuerySettings {
   constructor(
     combineCLIPwithMongo = false,
@@ -79,6 +82,7 @@ function generateUniqueClientId() {
 }
 
 let clients = new Map(); // This map stores the associations between client IDs and their WebSocket connections
+
 wss.on("connection", (ws) => {
   // WebSocket connection handling logic
 
@@ -87,6 +91,10 @@ wss.on("connection", (ws) => {
   console.log("client connected: %s", clientId);
   let clientSettings = new QuerySettings();
   settingsMap.set(clientId, clientSettings);
+
+  if(submittedVideos.length > 0) {
+    broadCastMessage({type: "updatesubmissions", videoId: submittedVideos});
+  }
 
   //check CLIPserver connection
   if (clipWebSocketV3C === null) {
@@ -154,6 +162,13 @@ wss.on("connection", (ws) => {
       queryCluster(clientId, msg.content);
     } else if (msg.content.type === "clusterimage") {
       queryClustersByImage(clientId, msg.content);
+    } else if (msg.content.type === "videosubmission") {
+      submittedVideos.push(msg.content.videoId); //store all submitted videos
+      let updateMessage = {
+        type: "updatesubmissions",
+        videoId: submittedVideos,
+        };
+      broadCastMessage(updateMessage);
     } else {
       //check CLIPserver connection
       if (clipWebSocket === null) {
@@ -233,11 +248,19 @@ wss.on("connection", (ws) => {
 
   ws.on("close", function close() {
     console.log("client disconnected");
+    clients.delete(clientId);
     // Close the MongoDB connection when finished
     //mongoclient.close();
   });
 });
 
+function broadCastMessage(message) { //Send submitted frame to all clients
+  clients.forEach((client) => {
+    if(client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(message));
+    }
+  });
+}
 //////////////////////////////////////////////////////////////////
 // Parameter Parsing
 //////////////////////////////////////////////////////////////////
