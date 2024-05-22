@@ -176,6 +176,12 @@ wss.on("connection", (ws) => {
         videoId: submittedVideos,
       };
       broadCastMessage(updateMessage);
+    } else if(msg.content.type === "share") {
+      let shareMessage = {
+        type: "share",
+        url: msg.content.url
+      };
+      broadCastMessage(shareMessage, clientId);
     } else {
       //check CLIPserver connection
       if (clipWebSocket === null) {
@@ -261,10 +267,10 @@ wss.on("connection", (ws) => {
   });
 });
 
-function broadCastMessage(message) { //Send submitted frame to all clients
-  clients.forEach((client) => {
-    if(client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify(message));
+function broadCastMessage(message, clientId = null) { //Send submitted frame to all clients
+  clients.forEach((ws, currentClientId) => {
+    if(ws.readyState === WebSocket.OPEN && currentClientId !== clientId) {
+      ws.send(JSON.stringify(message));
     }
   });
 }
