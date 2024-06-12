@@ -167,6 +167,7 @@ wss.on("connection", (ws) => {
       let updateMessage = {
         type: "updatesubmissions",
         videoId: submittedVideos,
+        submissionResult: msg.content.submissionResult
         };
       broadCastMessage(updateMessage);
     } else if(msg.content.type === "resetsubmission") {
