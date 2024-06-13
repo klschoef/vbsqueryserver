@@ -938,6 +938,8 @@ async function queryOCRText(clientId, queryInput) {
     const collection = database.collection("texts");
 
     let words = queryInput.query.split(/\s+/); // Split query input into words
+    words = words.map((word) => word.toLowerCase());
+
     let commonFrames = new Set();
 
     if (words.length === 1) {
@@ -949,8 +951,8 @@ async function queryOCRText(clientId, queryInput) {
 
       // Prioritize exact matches to be at the top
       documents.sort((a, b) => {
-        const aExact = a.text.toLowerCase() === words[0].toLowerCase();
-        const bExact = b.text.toLowerCase() === words[0].toLowerCase();
+        const aExact = a.text.toLowerCase() === words[0];
+        const bExact = b.text.toLowerCase() === words[0];
         return bExact - aExact;
       });
 
