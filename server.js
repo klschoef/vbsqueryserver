@@ -980,8 +980,21 @@ async function queryOCRText(clientId, queryInput) {
       dataset: "v3c",
     };
 
-    console.log("found " + response.num + " results");
-    console.log("sending back: " + JSON.stringify(response));
+    if(clientSettings.videoFiltering === "first") {
+      let filteredFrames = [];
+      let videoIds = [];
+
+      commonFrames.forEach((frame) => {
+        let videoId = getVideoId(frame);
+        if(!videoIds.includes(videoId)) {
+          videoIds.push(videoId);
+          filteredFrames.push(frame);
+        }
+      });
+      response.num = filteredFrames.length;
+      response.totalresults = filteredFrames.length;
+      response.results = filteredFrames;
+    }
 
     clientWS = clients.get(clientId);
     clientWS.send(JSON.stringify(response));
