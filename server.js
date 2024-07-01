@@ -936,75 +936,108 @@ async function queryOCRText(clientId, queryInput) {
     let clientSettings = settingsMap.get(clientId);
     const database = mongoclient.db(config.config_MONGODB);
     const collection = database.collection("texts");
+    let page = parseInt(queryInput.selectedpage);
+    let pageSize = parseInt(queryInput.resultsperpage);
 
     let words = queryInput.query.split(/\s+/); // Split query input into words
     words = words.map((word) => word.toLowerCase());
 
-    let commonFrames = new Set();
+    let commonFrames = new Set(); //To find frames with all words
+    let totalDocuments = 0; // Total number of documents
 
     if (words.length === 1) {
-      // Use regex for single word
+      // Look for exact matches
       const cursor = collection.find({
-        text: { $regex: new RegExp(words[0], "i") },
+        text: words[0],
       });
-      let documents = await cursor.toArray();
-
-      // Prioritize exact matches to be at the top
-      documents.sort((a, b) => {
-        const aExact = a.text.toLowerCase() === words[0];
-        const bExact = b.text.toLowerCase() === words[0];
-        return bExact - aExact;
+    
+      totalDocuments = await cursor.count(); // Get total count of documents
+    
+      const documents = await cursor.toArray(); // Get documents for the current page
+    
+      let framesSet = new Set();
+      documents.forEach((doc) => {
+        doc.frames.forEach((frame) => framesSet.add(frame));
       });
-
-      commonFrames = new Set(documents.flatMap((doc) => doc.frames));
+    
+      let framesArray = Array.from(framesSet); // Convert set to array to apply pagination
+    
+      totalDocuments = framesArray.length;
+    
+      // Skip frames based on page number
+      let frameSkip = (page - 1) * pageSize;
+    
+      if (framesArray.length > pageSize) {
+        framesArray = framesArray.slice(frameSkip, frameSkip + pageSize);
+      }
+    
+      commonFrames = new Set(framesArray);
     } else {
       // Use exact match for multiple words
       const cursor = collection.find({
         text: { $in: words },
       });
-      let documents = await cursor.toArray();
+    
+      totalDocuments = await cursor.count(); // Get total count of documents
+      const documents = await cursor.toArray(); // Get all matching documents
       let framesSets = documents.map((doc) => new Set(doc.frames));
-
+    
       // Find the intersection of all frame sets
+      let commonFramesSet = new Set();
       if (framesSets.length > 0) {
-        commonFrames = framesSets.reduce(
+        commonFramesSet = framesSets.reduce(
           (a, b) => new Set([...a].filter((x) => b.has(x)))
         );
       }
+    
+      let framesArray = Array.from(commonFramesSet); // Convert set to array to apply pagination
+      totalDocuments = framesArray.length;
+    
+      // Skip frames based on page number
+      let frameSkip = (page - 1) * pageSize;
+    
+      if (framesArray.length > pageSize) {
+        framesArray = framesArray.slice(frameSkip, frameSkip + pageSize);
+      }
+    
+      commonFrames = new Set(framesArray); 
     }
 
     let response = {
       type: "ocr-text",
       num: commonFrames.size,
       results: Array.from(commonFrames),
-      totalresults: commonFrames.size,
+      totalresults: totalDocuments,
       scores: new Array(commonFrames.size).fill(1),
       dataset: "v3c",
     };
 
-    if(clientSettings.videoFiltering === "first") {
+    if (clientSettings.videoFiltering === "first") {
       let filteredFrames = [];
       let videoIds = [];
 
       commonFrames.forEach((frame) => {
         let videoId = getVideoId(frame);
-        if(!videoIds.includes(videoId)) {
+        if (!videoIds.includes(videoId)) {
           videoIds.push(videoId);
           filteredFrames.push(frame);
         }
       });
       response.num = filteredFrames.length;
-      response.totalresults = filteredFrames.length;
+      response.totalresults = totalDocuments;
       response.results = filteredFrames;
     }
 
     clientWS = clients.get(clientId);
     clientWS.send(JSON.stringify(response));
+
+    console.log(response)
   } catch (error) {
     console.log("error with mongodb: " + error);
     await mongoclient.close();
   }
 }
+
 
 async function queryVideoID(clientId, queryInput) {
   try {
