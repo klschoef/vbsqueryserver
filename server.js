@@ -38,8 +38,8 @@ let text,
   filename,
   similarto;
 
-  //store submitted videos
-  let submittedVideos = [];
+//store submitted videos
+let submittedVideos = [];
 
 class QuerySettings {
   constructor(
@@ -92,8 +92,8 @@ wss.on("connection", (ws) => {
   let clientSettings = new QuerySettings();
   settingsMap.set(clientId, clientSettings);
 
-  if(submittedVideos.length > 0) {
-    broadCastMessage({type: "updatesubmissions", videoId: submittedVideos});
+  if (submittedVideos.length > 0) {
+    broadCastMessage({ type: "updatesubmissions", videoId: submittedVideos });
   }
 
   //check CLIPserver connection
@@ -167,20 +167,20 @@ wss.on("connection", (ws) => {
       let updateMessage = {
         type: "updatesubmissions",
         videoId: submittedVideos,
-        submissionResult: msg.content.submissionResult
-        };
+        submissionResult: msg.content.submissionResult,
+      };
       broadCastMessage(updateMessage);
-    } else if(msg.content.type === "resetsubmission") {
+    } else if (msg.content.type === "resetsubmission") {
       submittedVideos = [];
       let updateMessage = {
         type: "updatesubmissions",
         videoId: submittedVideos,
       };
       broadCastMessage(updateMessage);
-    } else if(msg.content.type === "share") {
+    } else if (msg.content.type === "share") {
       let shareMessage = {
         type: "share",
-        url: msg.content.url
+        url: msg.content.url,
       };
       broadCastMessage(shareMessage, clientId);
     } else {
@@ -268,9 +268,10 @@ wss.on("connection", (ws) => {
   });
 });
 
-function broadCastMessage(message, clientId = null) { //Send submitted frame to all clients
+function broadCastMessage(message, clientId = null) {
+  //Send submitted frame to all clients
   clients.forEach((ws, currentClientId) => {
-    if(ws.readyState === WebSocket.OPEN && currentClientId !== clientId) {
+    if (ws.readyState === WebSocket.OPEN && currentClientId !== clientId) {
       ws.send(JSON.stringify(message));
     }
   });
@@ -938,50 +939,50 @@ async function queryOCRText(clientId, queryInput) {
     const collection = database.collection("texts");
     let page = parseInt(queryInput.selectedpage);
     let pageSize = parseInt(queryInput.resultsperpage);
-
-    let words = queryInput.query.split(/\s+/); // Split query input into words
-    words = words.map((word) => word.toLowerCase());
-
     let commonFrames = new Set(); //To find frames with all words
     let totalDocuments = 0; // Total number of documents
+    let words = queryInput.query.split(/\s+/); // Split query input into words
+    words = words.map((word) => word.toLowerCase());
+    
+    console.log(console.log("received from client: %s (%s)", queryInput, clientId));
 
     if (words.length === 1) {
       // Look for exact matches
       const cursor = collection.find({
         text: words[0],
       });
-    
+
       totalDocuments = await cursor.count(); // Get total count of documents
-    
+
       const documents = await cursor.toArray(); // Get documents for the current page
-    
+
       let framesSet = new Set();
       documents.forEach((doc) => {
         doc.frames.forEach((frame) => framesSet.add(frame));
       });
-    
+
       let framesArray = Array.from(framesSet); // Convert set to array to apply pagination
-    
+
       totalDocuments = framesArray.length;
-    
+
       // Skip frames based on page number
       let frameSkip = (page - 1) * pageSize;
-    
+
       if (framesArray.length > pageSize) {
         framesArray = framesArray.slice(frameSkip, frameSkip + pageSize);
       }
-    
+
       commonFrames = new Set(framesArray);
     } else {
       // Use exact match for multiple words
       const cursor = collection.find({
         text: { $in: words },
       });
-    
+
       totalDocuments = await cursor.count(); // Get total count of documents
       const documents = await cursor.toArray(); // Get all matching documents
       let framesSets = documents.map((doc) => new Set(doc.frames));
-    
+
       // Find the intersection of all frame sets
       let commonFramesSet = new Set();
       if (framesSets.length > 0) {
@@ -989,18 +990,18 @@ async function queryOCRText(clientId, queryInput) {
           (a, b) => new Set([...a].filter((x) => b.has(x)))
         );
       }
-    
+
       let framesArray = Array.from(commonFramesSet); // Convert set to array to apply pagination
       totalDocuments = framesArray.length;
-    
+
       // Skip frames based on page number
       let frameSkip = (page - 1) * pageSize;
-    
+
       if (framesArray.length > pageSize) {
         framesArray = framesArray.slice(frameSkip, frameSkip + pageSize);
       }
-    
-      commonFrames = new Set(framesArray); 
+
+      commonFrames = new Set(framesArray);
     }
 
     let response = {
@@ -1030,14 +1031,11 @@ async function queryOCRText(clientId, queryInput) {
 
     clientWS = clients.get(clientId);
     clientWS.send(JSON.stringify(response));
-
-    console.log(response)
   } catch (error) {
     console.log("error with mongodb: " + error);
     await mongoclient.close();
   }
 }
-
 
 async function queryVideoID(clientId, queryInput) {
   try {
