@@ -38,6 +38,9 @@ let text,
   filename,
   similarto;
 
+//store submitted videos
+let submittedVideos = [];
+
 class QuerySettings {
   constructor(
     combineCLIPwithMongo = false,
@@ -79,6 +82,7 @@ function generateUniqueClientId() {
 }
 
 let clients = new Map(); // This map stores the associations between client IDs and their WebSocket connections
+
 wss.on("connection", (ws) => {
   // WebSocket connection handling logic
 
@@ -87,6 +91,10 @@ wss.on("connection", (ws) => {
   console.log("client connected: %s", clientId);
   let clientSettings = new QuerySettings();
   settingsMap.set(clientId, clientSettings);
+
+  if (submittedVideos.length > 0) {
+    broadCastMessage({ type: "updatesubmissions", videoId: submittedVideos });
+  }
 
   //check CLIPserver connection
   if (clipWebSocketV3C === null) {
@@ -154,6 +162,27 @@ wss.on("connection", (ws) => {
       queryCluster(clientId, msg.content);
     } else if (msg.content.type === "clusterimage") {
       queryClustersByImage(clientId, msg.content);
+    } else if (msg.content.type === "videosubmission") {
+      submittedVideos.push(msg.content.videoId); //store all submitted videos
+      let updateMessage = {
+        type: "updatesubmissions",
+        videoId: submittedVideos,
+        submissionResult: msg.content.submissionResult,
+      };
+      broadCastMessage(updateMessage);
+    } else if (msg.content.type === "resetsubmission") {
+      submittedVideos = [];
+      let updateMessage = {
+        type: "updatesubmissions",
+        videoId: submittedVideos,
+      };
+      broadCastMessage(updateMessage);
+    } else if (msg.content.type === "share") {
+      let shareMessage = {
+        type: "share",
+        url: msg.content.url,
+      };
+      broadCastMessage(shareMessage, clientId);
     } else {
       //check CLIPserver connection
       if (clipWebSocket === null) {
@@ -233,11 +262,20 @@ wss.on("connection", (ws) => {
 
   ws.on("close", function close() {
     console.log("client disconnected");
+    clients.delete(clientId);
     // Close the MongoDB connection when finished
     //mongoclient.close();
   });
 });
 
+function broadCastMessage(message, clientId = null) {
+  //Send submitted frame to all clients
+  clients.forEach((ws, currentClientId) => {
+    if (ws.readyState === WebSocket.OPEN && currentClientId !== clientId) {
+      ws.send(JSON.stringify(message));
+    }
+  });
+}
 //////////////////////////////////////////////////////////////////
 // Parameter Parsing
 //////////////////////////////////////////////////////////////////
@@ -899,52 +937,97 @@ async function queryOCRText(clientId, queryInput) {
     let clientSettings = settingsMap.get(clientId);
     const database = mongoclient.db(config.config_MONGODB);
     const collection = database.collection("texts");
-
+    let page = parseInt(queryInput.selectedpage);
+    let pageSize = parseInt(queryInput.resultsperpage);
+    let commonFrames = new Set(); //To find frames with all words
+    let totalDocuments = 0; // Total number of documents
     let words = queryInput.query.split(/\s+/); // Split query input into words
-    let commonFrames = new Set();
+    words = words.map((word) => word.toLowerCase());
+    
+    console.log(console.log("received from client: %s (%s)", queryInput, clientId));
 
     if (words.length === 1) {
-      // Use regex for single word
+      // Look for exact matches
       const cursor = collection.find({
-        text: { $regex: new RegExp(words[0], "i") },
-      });
-      let documents = await cursor.toArray();
-
-      // Prioritize exact matches to be at the top
-      documents.sort((a, b) => {
-        const aExact = a.text.toLowerCase() === words[0].toLowerCase();
-        const bExact = b.text.toLowerCase() === words[0].toLowerCase();
-        return bExact - aExact;
+        text: words[0],
       });
 
-      commonFrames = new Set(documents.flatMap((doc) => doc.frames));
+      totalDocuments = await cursor.count(); // Get total count of documents
+
+      const documents = await cursor.toArray(); // Get documents for the current page
+
+      let framesSet = new Set();
+      documents.forEach((doc) => {
+        doc.frames.forEach((frame) => framesSet.add(frame));
+      });
+
+      let framesArray = Array.from(framesSet); // Convert set to array to apply pagination
+
+      totalDocuments = framesArray.length;
+
+      // Skip frames based on page number
+      let frameSkip = (page - 1) * pageSize;
+
+      if (framesArray.length > pageSize) {
+        framesArray = framesArray.slice(frameSkip, frameSkip + pageSize);
+      }
+
+      commonFrames = new Set(framesArray);
     } else {
       // Use exact match for multiple words
       const cursor = collection.find({
         text: { $in: words },
       });
-      let documents = await cursor.toArray();
+
+      totalDocuments = await cursor.count(); // Get total count of documents
+      const documents = await cursor.toArray(); // Get all matching documents
       let framesSets = documents.map((doc) => new Set(doc.frames));
 
       // Find the intersection of all frame sets
+      let commonFramesSet = new Set();
       if (framesSets.length > 0) {
-        commonFrames = framesSets.reduce(
+        commonFramesSet = framesSets.reduce(
           (a, b) => new Set([...a].filter((x) => b.has(x)))
         );
       }
+
+      let framesArray = Array.from(commonFramesSet); // Convert set to array to apply pagination
+      totalDocuments = framesArray.length;
+
+      // Skip frames based on page number
+      let frameSkip = (page - 1) * pageSize;
+
+      if (framesArray.length > pageSize) {
+        framesArray = framesArray.slice(frameSkip, frameSkip + pageSize);
+      }
+
+      commonFrames = new Set(framesArray);
     }
 
     let response = {
       type: "ocr-text",
       num: commonFrames.size,
       results: Array.from(commonFrames),
-      totalresults: commonFrames.size,
+      totalresults: totalDocuments,
       scores: new Array(commonFrames.size).fill(1),
       dataset: "v3c",
     };
 
-    console.log("found " + response.num + " results");
-    console.log("sending back: " + JSON.stringify(response));
+    if (clientSettings.videoFiltering === "first") {
+      let filteredFrames = [];
+      let videoIds = [];
+
+      commonFrames.forEach((frame) => {
+        let videoId = getVideoId(frame);
+        if (!videoIds.includes(videoId)) {
+          videoIds.push(videoId);
+          filteredFrames.push(frame);
+        }
+      });
+      response.num = filteredFrames.length;
+      response.totalresults = totalDocuments;
+      response.results = filteredFrames;
+    }
 
     clientWS = clients.get(clientId);
     clientWS.send(JSON.stringify(response));
