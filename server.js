@@ -181,6 +181,7 @@ wss.on("connection", (ws) => {
       let shareMessage = {
         type: "share",
         url: msg.content.url,
+        query: msg.content.query
       };
       broadCastMessage(shareMessage, clientId);
     } else {
