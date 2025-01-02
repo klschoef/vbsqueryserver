@@ -957,6 +957,8 @@ async function queryOCRText(clientId, queryInput) {
 
       const documents = await cursor.toArray(); // Get documents for the current page
 
+      console.log(documents);
+
       let framesSet = new Set();
       documents.forEach((doc) => {
         doc.frames.forEach((frame) => framesSet.add(frame));
@@ -1170,12 +1172,12 @@ async function querySpeech(clientId, queryInput) {
 
     const regexQuery = new RegExp(queryInput.query, "i"); // Create a case-insensitive regular expression
 
-    const cursor = await collection.find({
+    /*const cursor = await collection.find({
       $or: [
-        { "speech.text": { $regex: regexQuery } },
-        { "speech.keywords": { $regex: regexQuery } },
-      ],
+        { "asr.speech": { $regex: regexQuery } }
+        ],
     });
+
 
     let results = [];
     let scores = [];
@@ -1192,7 +1194,47 @@ async function querySpeech(clientId, queryInput) {
         results.push(document.videoid + "/" + shot.keyframe);
         scores.push(1);
       }
-    });
+    });*/
+
+    const cursor = await collection.aggregate([
+      {
+        $match: {
+          "asr.speech": { $regex: regexQuery } // Match documents where speech matches the regex
+        }
+      },
+      {
+        $project: {
+          keyframes: {
+            $map: {
+              input: {
+                $filter: {
+                  input: "$asr",
+                  as: "item",
+                  cond: { $regexMatch: { input: "$$item.speech", regex: regexQuery } }
+                }
+              },
+              as: "filtered",
+              in: {
+                $concat: ["$videoid", "/", "$$filtered.keyframe"]
+              }
+            }
+          }
+        }
+      },
+      {
+        $unwind: "$keyframes" // Flatten the keyframes array into individual documents
+      },
+      {
+        $project: {
+          keyframe: "$keyframes" // Rename keyframes to keyframe
+        }
+      }
+    ]);
+    
+    // Extract only the keyframe field
+    const results = await cursor.map(doc => doc.keyframe).toArray();
+    const scores = Array(results.length).fill(1);
+    console.log(results);
 
     let response = {
       type: "speech",
