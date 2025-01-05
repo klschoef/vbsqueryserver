@@ -957,7 +957,7 @@ async function queryOCRText(clientId, queryInput) {
 
       const documents = await cursor.toArray(); // Get documents for the current page
 
-      console.log(documents);
+      //console.log(documents);
 
       let framesSet = new Set();
       documents.forEach((doc) => {
