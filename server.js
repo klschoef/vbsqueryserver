@@ -158,6 +158,8 @@ wss.on("connection", (ws) => {
       queryVideoID(clientId, msg.content);
     } else if (msg.content.type === "clusters") {
       queryClusters(clientId);
+    } else if (msg.content.type === "predictions") {
+      queryPredictions(clientId, msg.content);
     } else if (msg.content.type === "cluster") {
       queryCluster(clientId, msg.content);
     } else if (msg.content.type === "clusterimage") {
@@ -906,6 +908,23 @@ async function getVideoInfo(clientId, queryInput) {
   }
 }
 
+async function queryPredictions(clientId, queryInput) {
+  try {
+    let clientSettings = settingsMap.get(clientId);
+    const database = mongoclient.db(config.config_MONGODB);
+    const collection = database.collection("videos");
+
+    //TODO: let query = { "shots.predictions.class": Regex of queryInput}
+    //TODO2: Filter out the correct keyframes that have queryInput in predictions
+    
+
+  } catch (error) {
+    console.log("error with mongodb: " + error);
+    await mongoclient.close();
+  } finally {
+  }
+}
+
 async function getVideoSummaries(clientId, queryInput) {
   try {
     let clientSettings = settingsMap.get(clientId);
@@ -933,6 +952,25 @@ async function getVideoSummaries(clientId, queryInput) {
   }
 }
 
+function filterDatasets(frames, dataset) {
+  let framesArray = frames;
+  if (dataset === "v3c") {
+    framesArray = framesArray.filter((frame) =>
+      /^[\d]+$/.test(frame.split('/')[0]) // First part contains only digits
+    );
+  } else if (dataset === "lhe") {
+    framesArray = framesArray.filter((frame) =>
+      /^LHE\d+$/.test(frame.split('/')[0]) // First part starts with "LHE" followed by digits
+    );
+  } else if (dataset === "mvk") {
+    framesArray = framesArray.filter((frame) => {
+      const firstPart = frame.split('/')[0]; // Extract the first part before the '/'
+      return /^[^LHE][a-zA-Z].*$/.test(firstPart); // Contains letters and does not start with "LHE"
+    });
+  }
+  return framesArray;
+}
+
 async function queryOCRText(clientId, queryInput) {
   try {
     let clientSettings = settingsMap.get(clientId);
@@ -943,6 +981,7 @@ async function queryOCRText(clientId, queryInput) {
     let commonFrames = new Set(); //To find frames with all words
     let totalDocuments = 0; // Total number of documents
     let words = queryInput.query.split(/\s+/); // Split query input into words
+    let dataset = queryInput.dataset; 
     words = words.map((word) => word.toLowerCase());
     
     console.log(console.log("received from client: %s (%s)", queryInput, clientId));
@@ -957,14 +996,12 @@ async function queryOCRText(clientId, queryInput) {
 
       const documents = await cursor.toArray(); // Get documents for the current page
 
-      console.log(documents);
-
       let framesSet = new Set();
       documents.forEach((doc) => {
         doc.frames.forEach((frame) => framesSet.add(frame));
       });
 
-      let framesArray = Array.from(framesSet); // Convert set to array to apply pagination
+      let framesArray = filterDatasets(Array.from(framesSet), dataset); // Convert set to array to apply pagination
 
       totalDocuments = framesArray.length;
 
@@ -994,7 +1031,8 @@ async function queryOCRText(clientId, queryInput) {
         );
       }
 
-      let framesArray = Array.from(commonFramesSet); // Convert set to array to apply pagination
+      let framesArray = filterDatasets(Array.from(commonFramesSet), dataset); // Convert set to array to apply pagination
+
       totalDocuments = framesArray.length;
 
       // Skip frames based on page number
