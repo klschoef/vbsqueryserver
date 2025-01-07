@@ -61,6 +61,7 @@ let settingsMap = new Map();
 const http = require("http");
 const express = require("express");
 const { LocalConfig } = require("./local-config");
+const { type } = require("os");
 const app = express();
 app.use(cors()); // Enable CORS for all routes
 const port = 8080;
@@ -914,16 +915,63 @@ async function queryPredictions(clientId, queryInput) {
     const database = mongoclient.db(config.config_MONGODB);
     const collection = database.collection("videos");
 
-    //TODO: let query = { "shots.predictions.class": Regex of queryInput}
-    //TODO2: Filter out the correct keyframes that have queryInput in predictions
-    
+    const searchString = queryInput.query; 
+    const regex = new RegExp(searchString, 'i'); 
 
+    const page = parseInt(queryInput.selectedpage) || 1; 
+    const pageSize = parseInt(queryInput.resultsperpage) || 10; 
+
+    const query = {
+      "shots.predictions.class": { $regex: regex },
+    };
+
+    const documents = await collection.find(query).toArray();
+
+    let matchingKeyframes = [];
+
+    documents.forEach((doc) => {
+      doc.shots.forEach((shot) => {
+        if (shot.predictions) {
+          shot.predictions.forEach((prediction) => {
+            if (regex.test(prediction.class)) {
+              matchingKeyframes.push({
+                keyframe: `${doc.videoid}/${shot.keyframe}`,
+                score: prediction.score,
+              });
+            }
+          });
+        }
+      });
+    });
+
+    //sort by descending score
+    matchingKeyframes.sort((a, b) => b.score - a.score);
+
+    const totalResults = matchingKeyframes.length;
+    const paginatedKeyframes = matchingKeyframes.slice(
+      (page - 1) * pageSize,
+      page * pageSize
+    );
+
+    let response = {
+      type: "predictions",
+      num: paginatedKeyframes.length,
+      results: paginatedKeyframes.map((kf) => kf.keyframe), 
+      totalresults: totalResults,
+      scores: paginatedKeyframes.map((kf) => kf.score),
+      dataset: "lhe",
+    };
+
+    clientWS = clients.get(clientId);
+    clientWS.send(JSON.stringify(response));
   } catch (error) {
-    console.log("error with mongodb: " + error);
+    console.error("Error with MongoDB: ", error);
     await mongoclient.close();
-  } finally {
   }
 }
+
+
+
 
 async function getVideoSummaries(clientId, queryInput) {
   try {
